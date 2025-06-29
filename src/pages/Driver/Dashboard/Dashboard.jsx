@@ -15,7 +15,6 @@ import { VscSignOut } from "react-icons/vsc";
   
   const pageTitles = {
   "/dashboard": "Dashboard",
-  "/driver": "Start Working",
   "/dashboard/orders": "Order Lists",
   "/dashboard/customers": "Customers",
   "/dashboard/analytics": "Analytics",
@@ -37,7 +36,7 @@ const currentTitle = pageTitles[matchedPath] || "Dashboard";
   
     const menuItems = [
       { path: "/dashboard", label: "Dashboard", icon: <SlHome /> },
-      { path: "/driver", label: "Start Working", icon: <IoCarSportOutline /> },
+      { path: "/", label: "Start Working", icon: <IoCarSportOutline /> },
       { path: "orders", label: "Order Lists", icon: <TfiAlignLeft /> },
       { path: "customers", label: "Customers", icon: <FiUsers /> },
       { path: "analytics", label: "Analytics", icon: <TbBrandGoogleAnalytics /> },
