@@ -87,7 +87,7 @@ const currentTitle = pageTitles[matchedPath] || "Dashboard";
         {/* Content Area */}
         <div className="flex-1 ml-72">
           {/* Topbar */}
-          <div className="fixed top-0 left-72 right-0 h-16 flex items-center justify-between px-6 z-10">
+          <div className="fixed bg-[#FDFDFD] top-0 left-72 right-0 h-14 flex items-center justify-between px-6 z-10">
             <h1 className="text-xl font-semibold text-gray-800">{currentTitle}</h1>
             <div className="flex items-center gap-4 text-gray-600">
                 <div className=" bg-[#006eff2a] w-[36px] h-[36px] flex items-center justify-center rounded-lg relative">

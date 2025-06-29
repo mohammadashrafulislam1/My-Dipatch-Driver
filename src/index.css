@@ -116,6 +116,10 @@
   font-size: 14px;
 }
 
+/* stats CSS */
+.recharts-default-tooltip {
+  border-radius: 10px;
+}
 
 
 @tailwind base;

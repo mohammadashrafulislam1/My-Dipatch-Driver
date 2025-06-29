@@ -251,7 +251,7 @@ const Default = () => {
     {/* Remove background grid lines */}
     <CartesianGrid strokeDasharray="0" stroke="transparent" />
 
-    <Tooltip />
+    <Tooltip  className="rounded-xl"/>
     <Legend />
 
     <Area
@@ -270,6 +270,13 @@ const Default = () => {
 
 
 </div>
+
+{/* Recent Reviews */}
+   <div>
+   <h3 className="text-2xl font-semibold mt-4">Customer Review</h3>
+   <p className="text-md font-light mb-4 text-gray-500">Recent customer reviews</p>
+   </div>
+
 
    </div>
   );

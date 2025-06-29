@@ -51,7 +51,7 @@ const Driver = () => {
       </NavLink>
 
       <NavLink
-        to="/driver"
+        to="/"
         className={({ isActive }) =>
           `menu-items poppins-regular flex gap-2 items-center mb-[2px] ${
             isActive ? 'bg-[#006eff2a] text-[#006FFF]' : ''
@@ -63,7 +63,7 @@ const Driver = () => {
       </NavLink>
 
       <NavLink
-        to="/orders"
+        to="/dashboard/orders"
         className={({ isActive }) =>
           `menu-items poppins-regular flex gap-2 items-center mb-[2px] ${
             isActive ? 'bg-[#006eff2a] text-[#006FFF]' : ''
@@ -75,7 +75,7 @@ const Driver = () => {
       </NavLink>
 
       <NavLink
-        to="/customers"
+        to="/dashboard/customers"
         className={({ isActive }) =>
           `menu-items poppins-regular flex gap-2 items-center mb-[2px] ${
             isActive ? 'bg-[#006eff2a] text-[#006FFF]' : ''
@@ -87,7 +87,7 @@ const Driver = () => {
       </NavLink>
 
       <NavLink
-        to="/analytics"
+        to="/dashboard/analytics"
         className={({ isActive }) =>
           `menu-items poppins-regular flex gap-2 items-center mb-[2px] ${
             isActive ? 'bg-[#006eff2a] text-[#006FFF]' : ''
@@ -99,7 +99,7 @@ const Driver = () => {
       </NavLink>
 
       <NavLink
-        to="/reviews"
+        to="/dashboard/reviews"
         className={({ isActive }) =>
           `menu-items poppins-regular flex gap-2 items-center mb-[2px] ${
             isActive ? 'bg-[#006eff2a] text-[#006FFF]' : ''
@@ -111,7 +111,7 @@ const Driver = () => {
       </NavLink>
 
       <NavLink
-        to="/earnings"
+        to="/dashboard/earnings"
         className={({ isActive }) =>
           `menu-items poppins-regular flex gap-2 items-center mb-[2px] ${
             isActive ? 'bg-[#006eff2a] text-[#006FFF]' : ''
@@ -123,7 +123,7 @@ const Driver = () => {
       </NavLink>
 
       <NavLink
-        to="/map"
+        to="/dashboard/map"
         className={({ isActive }) =>
           `menu-items poppins-regular flex gap-2 items-center mb-[2px] ${
             isActive ? 'bg-[#006eff2a] text-[#006FFF]' : ''
@@ -135,7 +135,7 @@ const Driver = () => {
       </NavLink>
 
       <NavLink
-        to="/chat"
+        to="/dashboard/chat"
         className={({ isActive }) =>
           `menu-items poppins-regular flex gap-2 items-center mb-[2px] ${
             isActive ? 'bg-[#006eff2a] text-[#006FFF]' : ''
@@ -147,7 +147,7 @@ const Driver = () => {
       </NavLink>
 
       <NavLink
-        to="/wallet"
+        to="/dashboard/wallet"
         className={({ isActive }) =>
           `menu-items poppins-regular flex gap-2 items-center mb-[2px] ${
             isActive ? 'bg-[#006eff2a] text-[#006FFF]' : ''
