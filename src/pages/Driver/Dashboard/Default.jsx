@@ -9,7 +9,44 @@ import { TbTruckDelivery } from "react-icons/tb";
 import { FaCircleCheck, FaSackDollar } from "react-icons/fa6";
 import { MdCancel } from "react-icons/md";
 import { GrDeliver } from "react-icons/gr";
+import React from 'react';
+import {
+  PieChart, Pie, Cell, ResponsiveContainer,
+  LineChart, Line, XAxis, YAxis, Tooltip, Legend, CartesianGrid,
+  Area,
+  AreaChart
+} from 'recharts';
+  import { Download } from 'lucide-react'; // if you're using lucide-react
+// Sample dynamic data
+const pieData = {
+  totalOrder: 81,
+  customerGrowth: 22,
+  totalRevenue: 62,
+};
+const downloadReport = () => {
+    const dataStr = JSON.stringify(chartData, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+  
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'chart-data.json';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+  
+const COLORS = ['#FF4F4F', '#34D399', '#3B82F6'];
 
+const chartData = [
+  { day: 'Sun', orders: 100 },
+  { day: 'Mon', orders: 150 },
+  { day: 'Tues', orders: 456 },
+  { day: 'Wed', orders: 120 },
+  { day: 'Thu', orders: 110 },
+  { day: 'Fri', orders: 180 },
+  { day: 'Sat', orders: 240 },
+];
 const Default = () => {
   const [showCalendar, setShowCalendar] = useState(false);
   const [range, setRange] = useState([
@@ -20,6 +57,7 @@ const Default = () => {
     },
   ]);
 
+
   const toggleCalendar = () => {
     setShowCalendar((prev) => !prev);
   };
@@ -28,7 +66,12 @@ const Default = () => {
     range[0].endDate,
     "dd MMMM yyyy"
   )}`;
-
+  const pieCharts = [
+    { name: 'Total Order', value: pieData.totalOrder, color: COLORS[0] },
+    { name: 'Customer Growth', value: pieData.customerGrowth, color: COLORS[1] },
+    { name: 'Total Revenue', value: pieData.totalRevenue, color: COLORS[2] },
+  ];
+  
   return (
    <div>
     {/* Date and year */}
@@ -117,6 +160,117 @@ const Default = () => {
 </div>
 
 {/* charts */}
+<div className="flex gap-6 mt-6">
+
+  {/* Left: Pie Charts Grouped Together */}
+  <div className="bg-white rounded-xl shadow p-4 flex flex-col w-[45%]">
+    <h3 className="text-lg font-semibold mb-4">Pie Chart</h3>
+    <div className="flex flex-col md:flex-row justify-around items-center gap-1">
+      {pieCharts.map((item) => (
+       <div key={item.name} className="flex flex-col items-center">
+       <ResponsiveContainer width={100} height={100}>
+         <PieChart>
+           <Pie
+             data={[
+               { name: item.name, value: item.value },
+               { name: 'Remaining', value: 100 - item.value },
+             ]}
+             dataKey="value"
+             outerRadius={50}
+             innerRadius={30}
+             startAngle={90}
+             endAngle={-270}
+             label={({ cx, cy }) => (
+               <text
+                 x={cx}
+                 y={cy}
+                 textAnchor="middle"
+                 dominantBaseline="middle"
+                 className="text-lg font-bold"
+                 fill="#111827"
+               >
+                 {item.value}%
+               </text>
+             )}
+             labelLine={false}
+           >
+             <Cell fill={item.color} />
+             <Cell fill="#E5E7EB" />
+           </Pie>
+         </PieChart>
+       </ResponsiveContainer>
+     
+       {/* Title below the chart */}
+       <h4 className="text-sm font-medium mt-2">{item.name}</h4>
+     </div>
+     
+      ))}
+    </div>
+  </div>
+
+  {/* Right: Line Chart */}
+  <div className="bg-white rounded-xl shadow p-4 w-full lg:w-[55%] relative">
+      {/* Header */}
+      <div className="flex justify-between items-start mb-4">
+        <div>
+          <h3 className="text-lg font-semibold text-gray-800">Chart Order</h3>
+        </div>
+
+        <button
+          onClick={downloadReport}
+          className="flex items-center gap-2 bg-blue-100 text-blue-600 hover:bg-blue-200 px-4 py-1.5 rounded-lg text-sm font-medium"
+        >
+          <Download size={16} />
+          Save Report
+        </button>
+      </div>
+
+      {/* Chart */}
+      <ResponsiveContainer width="100%" height={150}>
+  <AreaChart
+    data={chartData}
+    margin={{ top: 10, right: 15, left: 15, bottom: 0 }}
+  >
+    <defs>
+      <linearGradient id="colorOrders" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor="#3B82F6" stopOpacity={0.4} />
+        <stop offset="100%" stopColor="#3B82F6" stopOpacity={0} />
+      </linearGradient>
+    </defs>
+
+    {/* Hide all axis lines and ticks */}
+    <XAxis
+      dataKey="day"
+      axisLine={false}
+      tickLine={false}
+      padding={{ left: 10, right: 10 }}
+      tick={{ fill: "#6B7280", fontSize: 12 }} // Optional styling for ticks
+    />
+    {/* No YAxis at all */}
+
+    {/* Remove background grid lines */}
+    <CartesianGrid strokeDasharray="0" stroke="transparent" />
+
+    <Tooltip />
+    <Legend />
+
+    <Area
+      type="monotone"
+      dataKey="orders"
+      stroke="#3B82F6"
+      fill="url(#colorOrders)"
+      strokeWidth={3}
+      activeDot={{ r: 8 }}
+    />
+  </AreaChart>
+</ResponsiveContainer>
+
+
+    </div>
+
+
+</div>
+
    </div>
   );
 };
