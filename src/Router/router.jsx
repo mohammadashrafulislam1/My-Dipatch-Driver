@@ -56,11 +56,6 @@ export const router = createBrowserRouter([
     },
     {
         path:'/',
-        element:<h1>Hii</h1>,
-        errorElement:<h1>err</h1>,
-    },
-    {
-        path:'/driver',
         element:<Driver/>,
         errorElement:<h1>err</h1>
     },
