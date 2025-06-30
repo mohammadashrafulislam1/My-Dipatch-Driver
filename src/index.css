@@ -120,6 +120,11 @@
 .recharts-default-tooltip {
   border-radius: 10px;
 }
+.slick-slider {
+  display: block !important;
+  visibility: visible !important;
+  height: auto !important;
+}
 
 
 @tailwind base;

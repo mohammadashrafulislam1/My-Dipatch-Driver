@@ -16,8 +16,9 @@ import {
   Area,
   AreaChart
 } from 'recharts';
-  import { Download } from 'lucide-react'; // if you're using lucide-react
-// Sample dynamic data
+  import { Download } from 'lucide-react'; 
+import ReviewCarousel from "../../../Components/ReviewCarousel";
+
 const pieData = {
   totalOrder: 81,
   customerGrowth: 22,
@@ -73,9 +74,9 @@ const Default = () => {
   ];
   
   return (
-   <div>
+   <div className="overflow-hidden">
     {/* Date and year */}
-    <div className="pt-2 relative">
+    <div className="pt-2 relative overflow-hidden">
       {/* Header */}
       <button
         onClick={toggleCalendar}
@@ -272,10 +273,12 @@ const Default = () => {
 </div>
 
 {/* Recent Reviews */}
-   <div>
-   <h3 className="text-2xl font-semibold mt-4">Customer Review</h3>
-   <p className="text-md font-light mb-4 text-gray-500">Recent customer reviews</p>
-   </div>
+   <div className="bg-white rounded-xl shadow p-4 mt-6 w-full">
+  <h3 className="text-2xl font-semibold">Customer Review</h3>
+  <p className="text-md font-light mb-4 text-gray-500">Recent customer reviews</p>
+  
+</div>
+
 
 
    </div>
