@@ -1,83 +1,70 @@
-import { Swiper, SwiperSlide } from "swiper/react";
-import { Navigation } from "swiper/modules";
-import "swiper/css";
-import "swiper/css/navigation";
 import { FaStar, FaStarHalfAlt, FaRegStar } from "react-icons/fa";
 
 const reviews = [
   {
     name: "Jons Sena",
-    image: "/avatar1.jpg",
+    image: "https://img.daisyui.com/images/stock/photo-1625726411847-8cbb60cc71e6.webp",
     rating: 4.5,
     text: "Lorem Ipsum is simply dummy text of the printing and typesetting industry.",
     daysAgo: "2 days ago",
   },
   {
     name: "Sofia",
-    image: "/avatar2.jpg",
+    image: "https://img.daisyui.com/images/stock/photo-1609621838510-5ad474b7d25d.webp",
     rating: 4.0,
     text: "Lorem Ipsum has been the industry's standard dummy text.",
     daysAgo: "2 days ago",
   },
   {
     name: "Anandreansyah",
-    image: "/avatar3.jpg",
+    image: "https://img.daisyui.com/images/stock/photo-1414694762283-acccc27bca85.webp",
+    rating: 5,
+    text: "Lorem Ipsum is simply dummy text of the printing and typesetting industry.",
+    daysAgo: "2 days ago",
+  },
+  {
+    name: "Anandreansyah",
+    image: "https://img.daisyui.com/images/stock/photo-1665553365602-b2fb8e5d1707.webp",
     rating: 5,
     text: "Lorem Ipsum is simply dummy text of the printing and typesetting industry.",
     daysAgo: "2 days ago",
   },
 ];
-
 const renderStars = (rating) => {
-  const full = Math.floor(rating);
-  const half = rating % 1 >= 0.5;
-  const empty = 5 - full - (half ? 1 : 0);
-
-  return (
-    <div className="flex items-center gap-1 text-yellow-500">
-      {[...Array(full)].map((_, i) => <FaStar key={`f-${i}`} />)}
-      {half && <FaStarHalfAlt key="half" />}
-      {[...Array(empty)].map((_, i) => <FaRegStar key={`e-${i}`} />)}
-    </div>
-  );
+  const stars = [];
+  for (let i = 1; i <= 5; i++) {
+    if (rating >= i) stars.push(<FaStar key={i} className="text-yellow-500" />);
+    else if (rating >= i - 0.5) stars.push(<FaStarHalfAlt key={i} className="text-yellow-500" />);
+    else stars.push(<FaRegStar key={i} className="text-yellow-500" />);
+  }
+  return stars;
 };
 
 const ReviewCarousel = () => {
   return (
-    <div className="mt-6 w-full">
-      <Swiper
-        modules={[Navigation]}
-        navigation
-        spaceBetween={20}
-        breakpoints={{
-          0: { slidesPerView: 1 },
-          768: { slidesPerView: 2 },
-        }}
-        className="!px-1"
-      >
-        {reviews.map((review, index) => (
-          <SwiperSlide key={index}>
-            <div className="bg-white shadow-md p-4 rounded-xl h-full min-h-[200px] flex flex-col justify-between">
-              <div className="flex items-center gap-3 mb-2">
-                <img
-                  src={review.image}
-                  alt={review.name}
-                  className="w-10 h-10 rounded-full object-cover"
-                />
-                <div>
-                  <h4 className="font-semibold text-sm">{review.name}</h4>
-                  <p className="text-xs text-gray-500">{review.daysAgo}</p>
-                </div>
-              </div>
-              <p className="text-sm text-gray-700 mb-3">{review.text}</p>
-              <div className="flex items-center justify-between">
-                {renderStars(review.rating)}
-                <span className="text-sm font-medium text-gray-600">{review.rating}</span>
-              </div>
-            </div>
-          </SwiperSlide>
-        ))}
-      </Swiper>
+    <div className="carousel w-fulls">
+      {reviews.map((review, index) => (
+        <div key={index} id={`slide${index + 1}`} className="carousel-item w-full">
+          <div className="flex flex-col items-center p-8 bg-white rounded-xl shadow-md w-full">
+            <img src={review.image} className="w-24 h-24 rounded-full mb-4" alt={review.name} />
+            <h1 className="text-2xl font-bold">{review.name}</h1>
+            <p className="py-2 text-center max-w-xl">{review.text}</p>
+            <p className="text-sm text-gray-500">{review.daysAgo}</p>
+            <div className="flex gap-1 my-2">{renderStars(review.rating)}</div>
+
+          </div>
+
+          {/* Navigation */}
+          <div className="absolute right-12 top-12 flex -translate-y-1/2 transform justify-center gap-2">
+            <a href={`#slide${(index - 1 + reviews.length) % reviews.length + 1}`} className="btn">
+              ❮
+            </a>
+            <a href={`#slide${(index + 1) % reviews.length + 1}`} className="btn">
+              ❯
+            </a>
+          </div>
+        </div>
+      ))}
     </div>
   );
 };

@@ -9,6 +9,7 @@ import Map from "../pages/Driver/Dashboard/Map";
 import Chat from "../pages/Driver/Dashboard/Chat";
 import Wallet from "../pages/Driver/Dashboard/Wallet";
 import Default from "../pages/Driver/Dashboard/Default";
+import Reviews from "../pages/Driver/Dashboard/Reviews";
 
 export const router = createBrowserRouter([
     {
@@ -34,7 +35,7 @@ export const router = createBrowserRouter([
             },
             {
                 path:'reviews',
-                element:<Order/>
+                element:<Reviews/>
             },
             {
                 path:'earnings',

@@ -273,10 +273,10 @@ const Default = () => {
 </div>
 
 {/* Recent Reviews */}
-   <div className="bg-white rounded-xl shadow p-4 mt-6 w-full">
+   <div className="bg-white rounded-xl shadow p-4 mt-6 w-full relative">
   <h3 className="text-2xl font-semibold">Customer Review</h3>
   <p className="text-md font-light mb-4 text-gray-500">Recent customer reviews</p>
-  
+ <ReviewCarousel />
 </div>
 
 
