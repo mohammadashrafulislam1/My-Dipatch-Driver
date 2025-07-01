@@ -75,30 +75,33 @@ const Default = () => {
   
   return (
    <div className="overflow-hidden">
-    {/* Date and year */}
-    <div className="pt-2 relative overflow-hidden">
-      {/* Header */}
-      <button
-        onClick={toggleCalendar}
-        className="flex items-center gap-2 text-gray-700 text-sm font-medium"
-      >
-        <span>{formattedRange}</span>
-        <IoChevronDown className="text-base" />
-      </button>
+    {/* Date Range Filter (styled) */}
+    <div className="pt-2 relative overflow-visible">
+        {/* Header */}
+        <button
+          onClick={toggleCalendar}
+          className="flex items-center gap-2 text-gray-700 text-sm font-medium"
+        >
+          <span>{formattedRange}</span>
+          <IoChevronDown className="text-base" />
+        </button>
 
-      {/* Calendar Dropdown */}
-      {showCalendar && (
-        <div className="absolute mt-2 z-50 bg-white shadow-lg rounded-md p-2">
-          <DateRange
-            editableDateInputs={true}
-            onChange={(item) => setRange([item.selection])}
-            moveRangeOnFirstSelection={false}
-            ranges={range}
-            rangeColors={["#006FFF"]}
-          />
-        </div>
-      )}
-    </div>
+        {/* Calendar Dropdown */}
+        {showCalendar && (
+          <div className="absolute mt-2 z-50 bg-white shadow-lg rounded-md md:p-2">
+            <DateRange
+              editableDateInputs={true}
+              onChange={(item) => {
+                console.log("DateRange onChange", item);
+                setRange([item.selection]);
+              }}
+              moveRangeOnFirstSelection={false}
+              ranges={range}
+              rangeColors={["#006FFF"]}
+            />
+          </div>
+        )}
+      </div>
 
 
     {/* Stats */}
