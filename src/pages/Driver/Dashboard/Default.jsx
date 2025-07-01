@@ -168,7 +168,7 @@ const Default = () => {
 </div>
 
 {/* charts */}
-<div className="flex flex-wrap gap-6 mt-6">
+<div className="flex lg:flex-nowrap flex-wrap gap-6 mt-6">
 
   {/* Left: Pie Charts Grouped Together */}
   <div className="bg-white rounded-xl shadow p-4 flex flex-col lg:w-[45%] w-full">
@@ -217,7 +217,7 @@ const Default = () => {
   </div>
 
   {/* Right: Line Chart */}
-  <div className="bg-white rounded-xl shadow p-4 w-full lg:lg:w-[55%] relative">
+  <div className="bg-white rounded-xl shadow p-4 w-full lg:w-[55%] relative">
       {/* Header */}
       <div className="flex justify-between items-start mb-4">
         <div>

@@ -70,7 +70,6 @@ const Dashboard = () => {
       >
         <IoMenuOutline size={24} />
       </button>
-
       {/* Sidebar */}
       {/* Desktop sidebar */}
       <div className="hidden lg:flex h-screen w-72 fixed bg-white shadow-[0_0_36.2px_rgba(0,0,0,0.05)] p-4 z-20 flex-col">
@@ -169,7 +168,7 @@ const Dashboard = () => {
       {/* Content Area */}
       <div className="flex-1 lg:ml-72 min-h-screen bg-[#FDFDFD] overflow-hidden">
         {/* Topbar */}
-        <div className="absolute md:ml-0 ml-12 mr-2 fixed bg-[#FDFDFD] top-6 md:top-0 left-0 right-0 h-14 
+        <div className="absolute md:ml-6 ml-12 mr-2 fixed md:bg-[#FDFDFD] top-6 md:top-0 left-0 right-0 h-14 
         flex flex-col-reverse md:flex-row md:items-center items-end justify-between lg:px-6 md:pr-3 md:pl-14 lg:pl-0 z-10 lg:left-72">
           <h1 className="text-xl font-semibold text-gray-800 md:mt-0 mt-2">{currentTitle}</h1>
           <div className="flex items-center md:gap-4 text-gray-600">
@@ -206,9 +205,19 @@ const Dashboard = () => {
             </div>
           </div>
         </div>
-
+        <div className="flex items-center gap-2 md:hidden mt-10 pl-5">
+              <span className="text-sm font-medium">John Doe</span>
+              <div className="avatar avatar-online">
+                <img
+                  src="https://i.pravatar.cc/40"
+                  alt="avatar"
+                  className="w-8 h-8 rounded-full "
+                />
+              </div>
+            </div>
+      
         {/* Dynamic Page Content */}
-        <main className="pt-14 mt-12 md:mt-2 lg:mt-0 px-6 pb-6 min-h-screen bg-[#FDFDFD]">
+        <main className="pt-3 md:pt-14 mt-0 md:mt-2 lg:mt-0 px-6 pb-6 min-h-screen bg-[#FDFDFD]">
           <Outlet />
         </main>
       </div>
