@@ -105,13 +105,14 @@ const Default = () => {
 
 
     {/* Stats */}
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5 mt-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:gap-5 gap-3 mt-6">
   {/* Card 1 */}
-  <div className="stat bg-white flex items-center gap-4 p-4 rounded shadow-sm">
-    <div className="stat-title bg-[#006eff2a] rounded-full w-[70px] h-[70px] flex items-center justify-center relative">
-      <FaClipboardList className="text-[40px] text-[#006FFF]" />
+  <div className="stat bg-white flex items-center gap-4 lg:p-4 p-2 rounded-xl shadow-sm">
+    <div className="stat-title bg-[#006eff2a] rounded-full lg:w-[70px] lg:h-[70px] w-[50px] h-[50px] flex items-center justify-center relative">
+      <FaClipboardList className="lg:text-[40px] text-[30px] text-[#006FFF]" />
       <FaArrowAltCircleDown
-        className="bg-[#FF0500] text-white text-[20px] px-1 rounded-full absolute top-[14px] right-[8px]"
+        className="bg-[#FF0500] text-white lg:text-[20px] text-[15px] px-1 rounded-full absolute lg:top-[14px] 
+        top-[8px] lg:right-[8px] right-[10px]"
       />
     </div>
     <div>
@@ -121,11 +122,12 @@ const Default = () => {
   </div>
 
   {/* Card 2 */}
-  <div className="stat bg-white flex items-center gap-4 p-4 rounded shadow-sm">
-    <div className="stat-title bg-[#006eff2a] rounded-full w-[70px] h-[70px] flex items-center justify-center relative">
-      <TbTruckDelivery className="text-[40px] text-[#006FFF]" />
+  <div className="stat bg-white flex items-center gap-4 lg:p-4 p-2 rounded-xl shadow-sm">
+    <div className="stat-title bg-[#006eff2a] rounded-full lg:w-[70px] lg:h-[70px] w-[50px] h-[50px] flex items-center justify-center relative">
+      <TbTruckDelivery className="lg:text-[40px] text-[30px] text-[#006FFF]" />
       <FaCircleCheck
-        className="bg-[#008000] text-white text-[20px] px-1 rounded-full absolute top-[14px] right-[8px]"
+        className="bg-[#008000] text-white lg:text-[20px] text-[15px] px-1 rounded-full absolute lg:top-[14px] 
+        top-[8px] lg:right-[8px] right-[10px]"
       />
     </div>
     <div>
@@ -135,11 +137,12 @@ const Default = () => {
   </div>
 
   {/* Card 3 */}
-  <div className="stat bg-white flex items-center gap-4 p-4 rounded shadow-sm">
-    <div className="stat-title bg-[#006eff2a] rounded-full w-[70px] h-[70px] flex items-center justify-center relative">
-      <GrDeliver className="text-[40px] text-[#006FFF]" />
+  <div className="stat bg-white flex items-center gap-4 lg:p-4 p-2 rounded-xl shadow-sm">
+    <div className="stat-title bg-[#006eff2a] rounded-full lg:w-[70px] lg:h-[70px] w-[50px] h-[50px] flex items-center justify-center relative">
+      <GrDeliver className="lg:text-[40px] text-[30px] text-[#006FFF]" />
       <MdCancel
-        className="bg-[#FF0500] text-white text-[20px] px-1 rounded-full absolute top-[14px] right-[8px]"
+        className="bg-[#FF0500] text-white lg:text-[20px] text-[15px] px-1 rounded-full absolute lg:top-[14px] 
+        top-[8px] lg:right-[8px] right-[10px]"
       />
     </div>
     <div>
@@ -149,11 +152,12 @@ const Default = () => {
   </div>
 
   {/* Card 4 */}
-  <div className="stat bg-white flex items-center gap-4 p-4 rounded shadow-sm">
-    <div className="stat-title bg-[#006eff2a] rounded-full w-[70px] h-[70px] flex items-center justify-center relative">
-      <FaSackDollar className="text-[40px] text-[#006FFF]" />
+  <div className="stat bg-white flex items-center gap-4 lg:p-4 p-2 rounded-xl shadow-sm">
+    <div className="stat-title bg-[#006eff2a] rounded-full lg:w-[70px] lg:h-[70px] w-[50px] h-[50px] flex items-center justify-center relative">
+      <FaSackDollar className="lg:text-[40px] text-[30px] text-[#006FFF]" />
       <FaArrowAltCircleUp
-        className="bg-[#008000] text-white text-[20px] px-1 rounded-full absolute top-[14px] right-[8px]"
+        className="bg-[#008000] text-white lg:text-[20px] text-[15px] px-1 rounded-full absolute lg:top-[14px] 
+        top-[8px] lg:right-[8px] right-[10px]"
       />
     </div>
     <div>
@@ -164,10 +168,10 @@ const Default = () => {
 </div>
 
 {/* charts */}
-<div className="flex gap-6 mt-6">
+<div className="flex flex-wrap gap-6 mt-6">
 
   {/* Left: Pie Charts Grouped Together */}
-  <div className="bg-white rounded-xl shadow p-4 flex flex-col w-[45%]">
+  <div className="bg-white rounded-xl shadow p-4 flex flex-col lg:w-[45%] w-full">
     <h3 className="text-lg font-semibold mb-4">Pie Chart</h3>
     <div className="flex flex-col md:flex-row justify-around items-center gap-1">
       {pieCharts.map((item) => (
@@ -213,7 +217,7 @@ const Default = () => {
   </div>
 
   {/* Right: Line Chart */}
-  <div className="bg-white rounded-xl shadow p-4 w-full lg:w-[55%] relative">
+  <div className="bg-white rounded-xl shadow p-4 w-full lg:lg:w-[55%] relative">
       {/* Header */}
       <div className="flex justify-between items-start mb-4">
         <div>
