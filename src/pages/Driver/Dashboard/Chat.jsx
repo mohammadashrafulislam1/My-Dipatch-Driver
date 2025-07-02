@@ -1,8 +1,8 @@
-import { useState } from "react";
-import { IoSend } from "react-icons/io5";
+import { useState, useEffect } from "react";
+import { useSearchParams, useNavigate } from "react-router-dom";
+import { IoSend, IoArrowBackOutline } from "react-icons/io5";
 import { BsCircleFill, BsPaperclip } from "react-icons/bs";
 import { MdImage } from "react-icons/md";
-import { IoArrowBackOutline } from "react-icons/io5";
 
 const users = [
   { id: 1, name: "John Doe", online: true },
@@ -14,9 +14,24 @@ const Chat = () => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState({});
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+
+  // Load user from URL if exists
+  const userIdFromQuery = searchParams.get("user");
+
+  useEffect(() => {
+    if (userIdFromQuery && !selectedUser) {
+      const foundUser = users.find((u) => u.id === Number(userIdFromQuery));
+      if (foundUser) {
+        setSelectedUser(foundUser);
+      }
+    }
+  }, [userIdFromQuery, selectedUser]);
 
   const handleUserClick = (user) => {
     setSelectedUser(user);
+    navigate(`/dashboard/chat?user=${user.id}`);
   };
 
   const handleSend = () => {
@@ -34,6 +49,7 @@ const Chat = () => {
 
   const handleBack = () => {
     setSelectedUser(null);
+    navigate("/dashboard/chat"); // clear query param
   };
 
   return (

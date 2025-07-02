@@ -12,6 +12,9 @@ import Default from "../pages/Driver/Dashboard/Default";
 import Reviews from "../pages/Driver/Dashboard/Reviews";
 import Login from "../pages/Authentication/Login";
 import Signup from "../pages/Authentication/Signup";
+import Profile from "../pages/Driver/Profile/Profile";
+import Settings from "../pages/Driver/Profile/Setting";
+import Notification from "../pages/Driver/Profile/Notification";
 
 export const router = createBrowserRouter([
     {
@@ -54,6 +57,18 @@ export const router = createBrowserRouter([
             {
                 path:'wallet',
                 element:<Wallet/>
+            },
+            {
+                path:'profile',
+                element:<Profile/>
+            },
+            {
+                path:'settings',
+                element:<Settings/>
+            },
+            {
+                path:'notifications',
+                element:<Notification/>
             },
         ]
     },
