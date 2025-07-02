@@ -1,3 +1,8 @@
+import { Swiper, SwiperSlide } from "swiper/react";
+import { Navigation } from "swiper/modules";
+import "swiper/css";
+import "swiper/css/navigation";
+
 import { FaStar, FaStarHalfAlt, FaRegStar } from "react-icons/fa";
 
 const reviews = [
@@ -23,13 +28,14 @@ const reviews = [
     daysAgo: "2 days ago",
   },
   {
-    name: "Anandreansyah",
-    image: "https://img.daisyui.com/images/stock/photo-1665553365602-b2fb8e5d1707.webp",
+    name: "Anandreansyah3",
+    image: "https://img.daisyui.com/images/stock/photo-1414694762283-acccc27bca85.webp",
     rating: 5,
     text: "Lorem Ipsum is simply dummy text of the printing and typesetting industry.",
     daysAgo: "2 days ago",
   },
 ];
+
 const renderStars = (rating) => {
   const stars = [];
   for (let i = 1; i <= 5; i++) {
@@ -40,31 +46,41 @@ const renderStars = (rating) => {
   return stars;
 };
 
+
 const ReviewCarousel = () => {
   return (
-    <div className="carousel w-fulls">
-      {reviews.map((review, index) => (
-        <div key={index} id={`slide${index + 1}`} className="carousel-item w-full">
-          <div className="flex flex-col items-center p-8 bg-white rounded-xl shadow-md w-full">
-            <img src={review.image} className="w-24 h-24 rounded-full mb-4" alt={review.name} />
-            <h1 className="text-2xl font-bold">{review.name}</h1>
-            <p className="py-2 text-center max-w-xl">{review.text}</p>
-            <p className="text-sm text-gray-500">{review.daysAgo}</p>
-            <div className="flex gap-1 my-2">{renderStars(review.rating)}</div>
-
-          </div>
-
-          {/* Navigation */}
-          <div className="absolute right-12 top-12 flex -translate-y-1/2 transform justify-center gap-2">
-            <a href={`#slide${(index - 1 + reviews.length) % reviews.length + 1}`} className="btn">
-              ❮
-            </a>
-            <a href={`#slide${(index + 1) % reviews.length + 1}`} className="btn">
-              ❯
-            </a>
-          </div>
-        </div>
-      ))}
+    <div className="w-full">
+      <Swiper
+        slidesPerView={1}
+        spaceBetween={24}
+        navigation={true}
+        modules={[Navigation]}
+        className="w-full"
+        breakpoints={{
+          768: {
+            slidesPerView: 2,
+          },
+          1024: {
+            slidesPerView: 3,
+          },
+        }}
+      >
+        {reviews.map((review, index) => (
+          <SwiperSlide key={index}>
+            <div className="bg-white shadow-md rounded-xl p-6 h-full flex flex-col justify-between transition-all hover:shadow-lg">
+              <div className="flex items-center gap-4 mb-4">
+                <img src={review.image} alt={review.name} className="w-12 h-12 rounded-full" />
+                <div>
+                  <h3 className="text-lg font-semibold">{review.name}</h3>
+                  <p className="text-sm text-gray-500">{review.daysAgo}</p>
+                </div>
+              </div>
+              <p className="text-sm text-gray-600 mb-4">{review.text}</p>
+              <div className="flex gap-1">{renderStars(review.rating)}</div>
+            </div>
+          </SwiperSlide>
+        ))}
+      </Swiper>
     </div>
   );
 };
