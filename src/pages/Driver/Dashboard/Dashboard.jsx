@@ -217,7 +217,7 @@ const Dashboard = () => {
             </div>
       
         {/* Dynamic Page Content */}
-        <main className="pt-3 md:pt-14 mt-0 md:mt-2 lg:mt-0 px-6 pb-6 min-h-screen bg-[#FDFDFD]">
+        <main className="pt-3 md:pt-14 mt-0 md:mt-2 lg:mt-0 md:px-6 px-3 pb-6 min-h-screen bg-[#FDFDFD]">
           <Outlet />
         </main>
       </div>

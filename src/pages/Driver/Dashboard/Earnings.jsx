@@ -94,7 +94,7 @@ const Earnings = () => {
           </button>
 
           {showCalendar && (
-            <div className="absolute mt-2 right-0 z-50 bg-white shadow-lg rounded-md p-2">
+            <div className="absolute mt-2 md:right-0 left-[0.2px] z-30 bg-white shadow-lg rounded-md md:p-2">
               <DateRange
                 editableDateInputs={true}
                 onChange={(item) => setRange([item.selection])}

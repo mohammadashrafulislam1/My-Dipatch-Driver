@@ -60,7 +60,7 @@ const Wallet = () => {
   });
 
   return (
-    <div className="max-w-3xl mx-auto p-4 space-y-6 relative">
+    <div className="md:max-w-3xl mx-auto p-4 space-y-6 relative">
       {/* Driver Balance */}
       <div className="bg-blue-600 text-white p-6 rounded-xl shadow-md">
         <div className="text-sm">Total Earnings</div>
@@ -108,7 +108,7 @@ const Wallet = () => {
 
         {/* Calendar Dropdown */}
         {showCalendar && (
-          <div className="absolute mt-2 z-50 bg-white shadow-lg rounded-md p-2">
+          <div className="absolute mt-2 md:right-0 right-0 z-30 bg-white shadow-lg rounded-md md:p-2">
             <DateRange
               editableDateInputs={true}
               onChange={(item) => {

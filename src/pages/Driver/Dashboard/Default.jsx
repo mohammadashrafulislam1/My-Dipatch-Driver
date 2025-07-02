@@ -88,7 +88,7 @@ const Default = () => {
 
         {/* Calendar Dropdown */}
         {showCalendar && (
-          <div className="absolute mt-2 z-50 bg-white shadow-lg rounded-md md:p-2">
+          <div className="absolute mt-2 z-30 bg-white shadow-lg rounded-md md:p-2">
             <DateRange
               editableDateInputs={true}
               onChange={(item) => {

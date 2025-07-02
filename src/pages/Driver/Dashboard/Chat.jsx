@@ -2,6 +2,7 @@ import { useState } from "react";
 import { IoSend } from "react-icons/io5";
 import { BsCircleFill, BsPaperclip } from "react-icons/bs";
 import { MdImage } from "react-icons/md";
+import { IoArrowBackOutline } from "react-icons/io5";
 
 const users = [
   { id: 1, name: "John Doe", online: true },
@@ -31,10 +32,18 @@ const Chat = () => {
     setMessage("");
   };
 
+  const handleBack = () => {
+    setSelectedUser(null);
+  };
+
   return (
-    <div className="flex h-[600px] max-w-4xl mx-auto bg-white shadow-md rounded-xl overflow-hidden">
+    <div className="flex h-[600px] max-w-4xl mx-auto bg-white shadow-md rounded-xl overflow-hidden relative">
       {/* Sidebar */}
-      <div className="w-1/3 border-r bg-gray-100">
+      <div
+        className={`w-full sm:w-1/3 border-r bg-gray-100 absolute sm:relative z-10 transition-transform duration-300 ${
+          selectedUser ? "translate-x-full sm:translate-x-0" : "translate-x-0"
+        } sm:translate-x-0`}
+      >
         <div className="p-4 text-xl font-bold border-b">Chats</div>
         <ul>
           {users.map((user) => (
@@ -67,12 +76,25 @@ const Chat = () => {
       </div>
 
       {/* Chat Box */}
-      <div className="flex-1 flex flex-col">
+      <div
+        className={`w-full sm:flex-1 flex flex-col transition-transform duration-300 ${
+          selectedUser ? "translate-x-0" : "translate-x-full sm:translate-x-0"
+        }`}
+      >
         {selectedUser ? (
           <>
-            <div className="p-4 border-b font-semibold">
+            <div className="p-4 border-b font-semibold flex items-center gap-2">
+              {/* Back Button for Mobile */}
+              <button
+                onClick={handleBack}
+                className="sm:hidden text-xl text-gray-600"
+              >
+                <IoArrowBackOutline />
+              </button>
               Chat with {selectedUser.name}
             </div>
+
+            {/* Messages */}
             <div className="flex-1 p-4 overflow-y-auto space-y-2">
               {(messages[selectedUser.id] || []).map((msg, i) => (
                 <div
@@ -90,7 +112,6 @@ const Chat = () => {
 
             {/* Input Area */}
             <div className="p-3 border-t flex items-center gap-2">
-              {/* Icons */}
               <div className="flex items-center gap-2 text-xl text-gray-600">
                 <label className="cursor-pointer">
                   <BsPaperclip />
@@ -102,7 +123,6 @@ const Chat = () => {
                 </label>
               </div>
 
-              {/* Input */}
               <input
                 type="text"
                 className="flex-1 border rounded-full px-4 py-2 outline-none"
@@ -120,7 +140,7 @@ const Chat = () => {
             </div>
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center text-gray-500">
+          <div className="hidden sm:flex flex-1 items-center justify-center text-gray-500">
             Select a user to start chatting
           </div>
         )}

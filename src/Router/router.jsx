@@ -10,6 +10,8 @@ import Chat from "../pages/Driver/Dashboard/Chat";
 import Wallet from "../pages/Driver/Dashboard/Wallet";
 import Default from "../pages/Driver/Dashboard/Default";
 import Reviews from "../pages/Driver/Dashboard/Reviews";
+import Login from "../pages/Authentication/Login";
+import Signup from "../pages/Authentication/Signup";
 
 export const router = createBrowserRouter([
     {
@@ -58,6 +60,16 @@ export const router = createBrowserRouter([
     {
         path:'/',
         element:<Driver/>,
+        errorElement:<h1>err</h1>
+    },
+    {
+        path:'/login',
+        element:<Login/>,
+        errorElement:<h1>err</h1>
+    },
+    {
+        path:'/signup',
+        element:<Signup/>,
         errorElement:<h1>err</h1>
     },
 ])
