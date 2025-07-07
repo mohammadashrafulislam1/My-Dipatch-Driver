@@ -123,14 +123,14 @@ const Driver = () => {
         </MapContainer>
 
         {/* Car Icon */}
-        <div className="absolute left-12 bottom-12 bg-blue-600 p-4 rounded-full text-white text-3xl shadow-xl animate-bounce z-10">
-          <FaCar />
-        </div>
+  <div className="absolute left-12 bottom-12 z-[1000] bg-blue-600 p-4 rounded-full text-white text-3xl shadow-xl animate-bounce">
+    <FaCar />
+  </div>
 
-        {/* Location Pin Icon */}
-        <div className="absolute right-12 top-12 bg-black p-4 rounded-full text-white text-3xl shadow-xl z-10 animate-pulse">
-          <FaMapMarkerAlt />
-        </div>
+  {/* Location Pin Icon */}
+  <div className="absolute right-12 top-12 z-[1000] bg-black p-4 rounded-full text-white text-3xl shadow-xl animate-pulse">
+    <FaMapMarkerAlt />
+  </div>
       </div>
     </div>
   );
