@@ -2,10 +2,7 @@ import { createBrowserRouter } from "react-router-dom";
 import Driver from "../pages/Driver/Driver";
 import Dashboard from "../pages/Driver/Dashboard/Dashboard";
 import Order from "../pages/Driver/Dashboard/Orders";
-import Customers from "../pages/Driver/Dashboard/Customers";
-import Analytics from "../pages/Driver/Dashboard/Analytics";
 import Earnings from "../pages/Driver/Dashboard/Earnings";
-import Map from "../pages/Driver/Dashboard/Map";
 import Chat from "../pages/Driver/Dashboard/Chat";
 import Wallet from "../pages/Driver/Dashboard/Wallet";
 import Default from "../pages/Driver/Dashboard/Default";
@@ -15,6 +12,7 @@ import Signup from "../pages/Authentication/Signup";
 import Profile from "../pages/Driver/Profile/Profile";
 import Settings from "../pages/Driver/Profile/Setting";
 import Notification from "../pages/Driver/Profile/Notification";
+import Support from "../pages/Driver/Dashboard/Support";
 
 export const router = createBrowserRouter([
     {
@@ -31,14 +29,6 @@ export const router = createBrowserRouter([
                 element:<Order/>
             },
             {
-                path:'customers',
-                element:<Customers/>
-            },
-            {
-                path:'analytics',
-                element:<Analytics/>
-            },
-            {
                 path:'reviews',
                 element:<Reviews/>
             },
@@ -47,8 +37,8 @@ export const router = createBrowserRouter([
                 element:<Earnings/>
             },
             {
-                path:'map',
-                element:<Map/>
+                path:'support',
+                element:<Support/>
             },
             {
                 path:'chat',

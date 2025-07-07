@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {
+  BiSupport,
   BiWalletAlt,
 } from "react-icons/bi";
 import {
@@ -52,13 +53,11 @@ const Dashboard = () => {
   const pageTitles = {
     "/dashboard": "Dashboard",
     "/dashboard/orders": "Order Lists",
-    "/dashboard/customers": "Customers",
-    "/dashboard/analytics": "Analytics",
     "/dashboard/reviews": "Reviews",
     "/dashboard/earnings": "Earnings",
-    "/dashboard/map": "Map",
     "/dashboard/chat": "Chat",
     "/dashboard/wallet": "Wallet",
+    "/dashboard/support": "Support",
   };
   const matchedPath = Object.keys(pageTitles)
     .sort((a, b) => b.length - a.length)
@@ -70,13 +69,11 @@ const Dashboard = () => {
     { path: "/dashboard", label: "Dashboard", icon: <SlHome /> },
     { path: "/", label: "Start Working", icon: <IoCarSportOutline /> },
     { path: "orders", label: "Order Lists", icon: <TfiAlignLeft /> },
-    { path: "customers", label: "Customers", icon: <FiUsers /> },
-    { path: "analytics", label: "Analytics", icon: <TbBrandGoogleAnalytics /> },
     { path: "reviews", label: "Reviews", icon: <MdOutlineReviews /> },
     { path: "earnings", label: "Earnings", icon: <BsCashCoin /> },
-    { path: "map", label: "Map", icon: <RiRoadMapLine /> },
     { path: "chat", label: "Chat", icon: <BsChatLeftDots /> },
     { path: "wallet", label: "Wallet", icon: <BiWalletAlt /> },
+    { path: "support", label: "Support", icon: <BiSupport /> },
   ];
 
   return (
