@@ -14,7 +14,7 @@ import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 
-// Fix Leaflet icon issue
+// Fix Leaflet marker icon paths
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl:
@@ -27,19 +27,19 @@ const Driver = () => {
   const position = [50.4452, -104.6189]; // Regina, SK
 
   return (
-    <div className="min-h-screen flex flex-col justify-between relative overflow-hidden font-sans">
+    <div className="min-h-screen flex flex-col justify-between relative overflow-hidden font-sans bg-white">
       {/* Top Bar and Menu */}
       <div className="absolute top-0 w-full z-10 flex justify-between items-start p-6">
         <div className="drawer">
           <input id="my-drawer" type="checkbox" className="drawer-toggle" />
-          <div className="drawer-content bg-[#f9f9f9] w-fit">
+          <div className="drawer-content w-full p-6">
             <label htmlFor="my-drawer" className="cursor-pointer">
               <div className="text-2xl text-black">
                 <RiMenu2Line />
               </div>
             </label>
           </div>
-          <div className="drawer-side">
+          <div className="drawer-side z-30">
             <label
               htmlFor="my-drawer"
               aria-label="close sidebar"
@@ -51,95 +51,29 @@ const Driver = () => {
                 alt=""
                 className="w-[150px] mx-auto mb-5"
               />
-              <NavLink
-                to="/dashboard"
-                className={({ isActive }) =>
-                  `menu-items poppins-regular flex gap-2 items-center mb-[2px] ${
-                    isActive ? "bg-[#006eff2a] text-[#006FFF]" : ""
-                  }`
-                }
-              >
-                <SlHome className="text-[16px]" />
-                Dashboard
-              </NavLink>
-              <NavLink
-                to="/"
-                className={({ isActive }) =>
-                  `menu-items poppins-regular flex gap-2 items-center mb-[2px] ${
-                    isActive ? "bg-[#006eff2a] text-[#006FFF]" : ""
-                  }`
-                }
-              >
-                <IoCarSportOutline className="text-[16px]" />
-                Start Working
-              </NavLink>
-              <NavLink
-                to="/dashboard/orders"
-                className={({ isActive }) =>
-                  `menu-items poppins-regular flex gap-2 items-center mb-[2px] ${
-                    isActive ? "bg-[#006eff2a] text-[#006FFF]" : ""
-                  }`
-                }
-              >
-                <TfiAlignLeft className="text-[16px]" />
-                Order Lists
-              </NavLink>
-              <NavLink
-                to="/dashboard/reviews"
-                className={({ isActive }) =>
-                  `menu-items poppins-regular flex gap-2 items-center mb-[2px] ${
-                    isActive ? "bg-[#006eff2a] text-[#006FFF]" : ""
-                  }`
-                }
-              >
-                <MdOutlineReviews className="text-[16px]" />
-                Reviews
-              </NavLink>
-              <NavLink
-                to="/dashboard/earnings"
-                className={({ isActive }) =>
-                  `menu-items poppins-regular flex gap-2 items-center mb-[2px] ${
-                    isActive ? "bg-[#006eff2a] text-[#006FFF]" : ""
-                  }`
-                }
-              >
-                <BsCashCoin className="text-[16px]" />
-                Earnings
-              </NavLink>
-              <NavLink
-                to="/dashboard/chat"
-                className={({ isActive }) =>
-                  `menu-items poppins-regular flex gap-2 items-center mb-[2px] ${
-                    isActive ? "bg-[#006eff2a] text-[#006FFF]" : ""
-                  }`
-                }
-              >
-                <BsChatLeftDots className="text-[16px]" />
-                Chat
-              </NavLink>
-              <NavLink
-                to="/dashboard/wallet"
-                className={({ isActive }) =>
-                  `menu-items poppins-regular flex gap-2 items-center mb-[2px] ${
-                    isActive ? "bg-[#006eff2a] text-[#006FFF]" : ""
-                  }`
-                }
-              >
-                <BiWalletAlt className="text-[16px]" />
-                Wallet
-              </NavLink>
-              <NavLink
-                to="/dashboard/support"
-                className={({ isActive }) =>
-                  `menu-items poppins-regular flex gap-2 items-center mb-[2px] ${
-                    isActive ? "bg-[#006eff2a] text-[#006FFF]" : ""
-                  }`
-                }
-              >
-                <BiSupport
-                 className="text-[16px]" />
-                Support
-              </NavLink>
+              {[
+                { to: "/dashboard", icon: <SlHome />, label: "Dashboard" },
+                { to: "/", icon: <IoCarSportOutline />, label: "Start Working" },
+                { to: "/dashboard/orders", icon: <TfiAlignLeft />, label: "Order Lists" },
+                { to: "/dashboard/reviews", icon: <MdOutlineReviews />, label: "Reviews" },
+                { to: "/dashboard/earnings", icon: <BsCashCoin />, label: "Earnings" },
+                { to: "/dashboard/chat", icon: <BsChatLeftDots />, label: "Chat" },
+                { to: "/dashboard/wallet", icon: <BiWalletAlt />, label: "Wallet" },
+                { to: "/dashboard/support", icon: <BiSupport />, label: "Support" },
+              ].map(({ to, icon, label }) => (
+                <NavLink
+                  key={to}
+                  to={to}
+                  className={({ isActive }) =>
+                    `menu-items poppins-regular flex gap-2 items-center mb-[2px] ${
+                      isActive ? "bg-[#006eff2a] text-[#006FFF]" : ""
+                    }`
+                  }
+                >
+                  {icon}
+                  {label}
+                </NavLink>
+              ))}
               <div className="divider mt-[20px] mb-0"></div>
               <NavLink
                 to="/logout"
@@ -153,7 +87,7 @@ const Driver = () => {
         </div>
 
         {/* Center Card */}
-        <div className="absolute left-1/2 transform -translate-x-1/2 top-24 max-w-lg w-[90vw] bg-white bg-opacity-90 backdrop-blur-md rounded-3xl p-10 shadow-2xl text-center z-20">
+        <div className="absolute left-1/2 transform -translate-x-1/2 top-32 max-w-lg w-[90vw] bg-white bg-opacity-90 backdrop-blur-md rounded-3xl p-10 shadow-2xl text-center z-20">
           <img
             src="https://i.ibb.co/6R7N010X/Logo-transparent.png"
             alt="Logo"
@@ -171,8 +105,8 @@ const Driver = () => {
         </div>
       </div>
 
-      {/* Live Map - Regina SK */}
-      <div className="absolute bottom-0 w-full h-[350px] sm:h-[450px] overflow-hidden z-0 rounded-t-3xl shadow-inner">
+      {/* Live Map - Regina, SK */}
+      <div className="absolute bottom-0 w-full h-[400px] sm:h-[540px] overflow-hidden z-0 rounded-t-3xl shadow-inner">
         <MapContainer
           center={position}
           zoom={13}
