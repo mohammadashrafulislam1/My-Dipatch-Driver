@@ -47,7 +47,7 @@ const Driver = () => {
             ></label>
             <ul className="menu bg-white text-base-content min-h-full w-72 p-4 overflow-y-auto">
               <img
-                src="https://i.ibb.co/6R7N010X/Logo-transparent.png"
+                src="https://i.ibb.co/Fkwr6fBV/IMG-7276-removebg-preview.png"
                 alt=""
                 className="w-[150px] mx-auto mb-5"
               />
@@ -89,7 +89,7 @@ const Driver = () => {
         {/* Center Card */}
         <div className="absolute left-1/2 transform -translate-x-1/2 top-32 max-w-lg w-[90vw] bg-white bg-opacity-90 backdrop-blur-md rounded-3xl p-10 shadow-2xl text-center z-20">
           <img
-            src="https://i.ibb.co/6R7N010X/Logo-transparent.png"
+            src="https://i.ibb.co/Fkwr6fBV/IMG-7276-removebg-preview.png"
             alt="Logo"
             className="w-40 mx-auto mb-6"
           />

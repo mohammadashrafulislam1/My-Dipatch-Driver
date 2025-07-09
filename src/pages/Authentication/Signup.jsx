@@ -27,7 +27,7 @@ const Signup = () => {
     <div className="min-h-screen flex items-center justify-center bg-[#F4F9FF] px-4">
       <div className="w-full max-w-md bg-white md:p-8 p-4 rounded-2xl shadow-2xl">
         <img
-          src="https://i.ibb.co/6R7N010X/Logo-transparent.png"
+          src="https://i.ibb.co/Fkwr6fBV/IMG-7276-removebg-preview.png"
           alt="Logo"
           className="w-[150px] mx-auto mb-6"
         />

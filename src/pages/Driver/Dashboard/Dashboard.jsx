@@ -91,7 +91,7 @@ const Dashboard = () => {
       {/* Desktop sidebar */}
       <div className="hidden lg:flex h-screen w-72 fixed bg-white shadow-[0_0_36.2px_rgba(0,0,0,0.05)] p-4 z-20 flex-col">
         <img
-          src="https://i.ibb.co/6R7N010X/Logo-transparent.png"
+          src="https://i.ibb.co/Fkwr6fBV/IMG-7276-removebg-preview.png"
           alt="Logo"
           className="w-[150px] mx-auto mb-6"
         />
@@ -146,7 +146,7 @@ const Dashboard = () => {
             </button>
 
             <img
-              src="https://i.ibb.co/6R7N010X/Logo-transparent.png"
+              src="https://i.ibb.co/Fkwr6fBV/IMG-7276-removebg-preview.png"
               alt="Logo"
               className="w-[150px] mx-auto mb-6"
             />
