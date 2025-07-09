@@ -28,7 +28,7 @@ const Login = () => {
     <div className="min-h-screen flex items-center justify-center bg-[#F4F9FF] px-4">
       <div className="w-full max-w-md bg-white p-6 sm:p-4 rounded-2xl shadow-xl">
         <img
-          src="https://i.ibb.co/Fkwr6fBV/IMG-7276-removebg-preview.png"
+          src="https://i.ibb.co/TxC947Cw/thumbnail-Image-2025-07-09-at-2-10-AM-removebg-preview.png"
           alt="Logo"
           className="w-[120px] sm:w-[150px] mx-auto mb-6"
         />
