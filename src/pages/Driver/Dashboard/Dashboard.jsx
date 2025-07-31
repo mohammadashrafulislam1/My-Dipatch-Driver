@@ -49,6 +49,7 @@ const Dashboard = () => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showMessages, setShowMessages] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
   
   const pageTitles = {
     "/dashboard": "Dashboard",
@@ -82,7 +83,7 @@ const Dashboard = () => {
       {/* Mobile Hamburger Button */}
       <button
         onClick={() => setSidebarOpen(true)}
-        className="absolute top-4 left-4 z-30 p-1 rounded-md bg-[#FDFDFD] text-gray-700 lg:hidden"
+        className="absolute top-4 left-4 z-30 p-1 rounded-md bg-[#FDFDFD] text-gray-700  hidden md:block"
         aria-label="Open menu"
       >
         <IoMenuOutline size={24} />
@@ -125,62 +126,123 @@ const Dashboard = () => {
         </NavLink>
       </div>
 
-      {/* Mobile Sidebar Overlay */}
-      {sidebarOpen && (
-        <div className="fixed inset-0 z-40 flex lg:hidden">
-          {/* Background overlay */}
-          <div
-            className="fixed inset-0 bg-black opacity-50"
-            onClick={() => setSidebarOpen(false)}
-          ></div>
+      {/* ==== MOBILE BOTTOM NAVIGATION ==== */}
+<div className="fixed bottom-0 left-0 right-0 bg-white shadow border-t border-gray-200 md:hidden z-50">
+  <div className="flex justify-between items-center px-6 py-2">
 
-          {/* Sidebar */}
-          <div className="relative bg-white w-64 p-4 flex flex-col overflow-y-auto shadow-lg">
-            {/* Close button */}
-            <button
-              onClick={() => setSidebarOpen(false)}
-              className="mb-6 self-end text-gray-700 hover:text-gray-900"
-              aria-label="Close menu"
-            >
-              <IoCloseOutline size={28} />
-            </button>
+    {/* Dashboard */}
+    <NavLink
+      to="/dashboard"
+      className={({ isActive }) =>
+        `flex flex-col items-center text-sm ${
+          isActive ? "text-blue-600" : "text-gray-500"
+        }`
+      }
+      onClick={() => setShowDropdown(false)}
+    >
+      <SlHome className="text-2xl" />
+      <span>Dashboard</span>
+    </NavLink>
 
-            <img
-              src="https://i.ibb.co/TxC947Cw/thumbnail-Image-2025-07-09-at-2-10-AM-removebg-preview.png"
-              alt="Logo"
-              className="w-[150px] mx-auto mb-6"
-            />
-            <div className="flex flex-col gap-1 flex-1">
-              {menuItems.map(({ path, label, icon }) => (
-                <NavLink
-                  key={path}
-                  to={path}
-                  className={({ isActive }) =>
-                    `flex items-center gap-2 px-3 py-2 rounded-md transition font-medium ${
-                      isActive
-                        ? "bg-[#006eff2a] text-[#006FFF]"
-                        : "text-gray-700 hover:bg-gray-100"
-                    }`
-                  }
-                  onClick={() => setSidebarOpen(false)}
-                >
-                  <span className="text-[16px]">{icon}</span>
-                  {label}
-                </NavLink>
-              ))}
-            </div>
-            <div className="divider mt-6 mb-2" />
-            <NavLink
-              to="/logout"
-              className="flex items-center gap-2 text-gray-700 px-3 py-2 hover:bg-gray-100 rounded-md"
-              onClick={() => setSidebarOpen(false)}
-            >
-              <VscSignOut className="text-[16px]" />
-              Sign Out
-            </NavLink>
-          </div>
+    {/* Start Working */}
+    <NavLink
+      to="/"
+      className={({ isActive }) =>
+        `flex flex-col items-center text-sm ${
+          isActive ? "text-blue-600" : "text-gray-500"
+        }`
+      }
+      onClick={() => setShowDropdown(false)}
+    >
+      <IoCarSportOutline className="text-2xl" />
+      <span className="text-xs mt-1">Start</span>
+    </NavLink>
+
+    {/* Chat */}
+    <NavLink
+      to="/dashboard/chat"
+      className={({ isActive }) =>
+        `flex flex-col items-center text-sm ${
+          isActive ? "text-blue-600" : "text-gray-500"
+        }`
+      }
+      onClick={() => setShowDropdown(false)}
+    >
+      <BsChatLeftDots className="text-2xl" />
+      <span>Chat</span>
+    </NavLink>
+
+    {/* Avatar Dropdown */}
+    <div className="relative group">
+      <div
+        className="cursor-pointer flex flex-col items-center text-sm text-gray-500"
+        onClick={() => setShowDropdown(!showDropdown)}
+      >
+        <img
+          src="https://i.pravatar.cc/40"
+          alt="Avatar"
+          className="w-7 h-7 rounded-full"
+        />
+        <span>More</span>
+      </div>
+
+      {/* Dropdown */}
+      {showDropdown && (
+        <div className="absolute bottom-12 right-0 w-48 bg-white border rounded-lg shadow-lg p-2 space-y-1 z-50">
+          <NavLink
+            to="/dashboard/orders"
+            className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-md text-sm"
+            onClick={() => setShowDropdown(false)}
+          >
+            <TfiAlignLeft className="text-orange-500 text-lg" />
+            Orders
+          </NavLink>
+          <NavLink
+            to="/dashboard/reviews"
+            className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-md text-sm"
+            onClick={() => setShowDropdown(false)}
+          >
+            <MdOutlineReviews className="text-purple-600 text-lg" />
+            Reviews
+          </NavLink>
+          <NavLink
+            to="/dashboard/earnings"
+            className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-md text-sm"
+            onClick={() => setShowDropdown(false)}
+          >
+            <BsCashCoin className="text-yellow-500 text-lg" />
+            Earnings
+          </NavLink>
+          <NavLink
+            to="/dashboard/wallet"
+            className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-md text-sm"
+            onClick={() => setShowDropdown(false)}
+          >
+            <BiWalletAlt className="text-blue-500 text-lg" />
+            Wallet
+          </NavLink>
+          <NavLink
+            to="/dashboard/support"
+            className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-md text-sm"
+            onClick={() => setShowDropdown(false)}
+          >
+            <BiSupport className="text-green-600 text-lg" />
+            Support
+          </NavLink>
+          <NavLink
+            to="/logout"
+            className="flex items-center gap-2 px-3 py-2 text-red-600 hover:bg-gray-100 rounded-md text-sm"
+            onClick={() => setShowDropdown(false)}
+          >
+            <VscSignOut className="text-red-600 text-lg" />
+            Sign Out
+          </NavLink>
         </div>
       )}
+    </div>
+  </div>
+</div>
+
 {showNotifications && (
   <div className="absolute right-4 top-14 w-80 bg-white shadow-xl rounded-xl z-50 border border-gray-200">
     <div className="px-4 py-3 border-b">
@@ -336,7 +398,7 @@ const Dashboard = () => {
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2 md:hidden mt-10 pl-5">
+        <div className="flex items-center gap-2 md:hidden mt-3 pl-5">
               <span className="text-sm font-medium">John Doe</span>
               <div className="avatar avatar-online">
                 <img
