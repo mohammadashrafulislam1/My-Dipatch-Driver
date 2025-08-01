@@ -67,7 +67,7 @@ const Driver = () => {
                   key={to}
                   to={to}
                   className={({ isActive }) =>
-                    `menu-items poppins-regular flex gap-2 items-center mb-[2px] ${
+                    `menu-items poppins-regular text-black  dark:text-black  flex gap-2 items-center mb-[2px] ${
                       isActive ? "bg-[#006eff2a] text-[#006FFF]" : ""
                     }`
                   }

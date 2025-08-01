@@ -78,7 +78,7 @@ const Dashboard = () => {
   ];
 
   return (
-    <div className="flex w-full overflow-hidden">
+    <div className="flex w-full overflow-hidden text-black  dark:text-black ">
 
       {/* Mobile Hamburger Button */}
       <button

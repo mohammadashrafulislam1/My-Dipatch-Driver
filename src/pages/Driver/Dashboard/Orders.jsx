@@ -47,7 +47,7 @@ const Order = () => {
         Showing {startIndex + 1} to {endIndex} of {totalItems} entries
       </div>
 
-      <div className="overflow-x-auto bg-white rounded-xl">
+      <div className="overflow-x-auto bg-white dark:bg-white  rounded-xl">
         <table className="table w-full">
           <thead>
             <tr>
@@ -62,7 +62,7 @@ const Order = () => {
           </thead>
           <tbody>
             {currentOrders.map((order, index) => (
-              <tr key={order.id} className={index % 2 === 0 ? "bg-base-200" : ""}>
+              <tr key={order.id} className={index % 2 === 0 ? "bg-base-200 dark:bg-base-100 dark:text-white text-white" : ""}>
                 <th>{startIndex + index + 1}</th>
                 <td>{order.name}</td>
                 <td>{order.from}</td>
