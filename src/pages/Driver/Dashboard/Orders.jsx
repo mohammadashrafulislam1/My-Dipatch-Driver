@@ -41,7 +41,7 @@ const Order = () => {
   };
 
   return (
-    <div className="p-4">
+    <div className="p-4 ">
       {/* Showing info */}
       <div className="mb-2 text-sm font-medium">
         Showing {startIndex + 1} to {endIndex} of {totalItems} entries
@@ -49,7 +49,7 @@ const Order = () => {
 
       <div className="overflow-x-auto bg-white dark:bg-white  rounded-xl">
         <table className="table w-full">
-          <thead>
+          <thead className="text-black dark:text-black ">
             <tr>
               <th></th>
               <th>Customer Name</th>
