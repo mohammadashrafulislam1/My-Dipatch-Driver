@@ -62,7 +62,7 @@ const Order = () => {
           </thead>
           <tbody>
             {currentOrders.map((order, index) => (
-              <tr key={order.id} className={index % 2 === 0 ? "bg-base-200 dark:bg-base-100 dark:text-white text-white" : ""}>
+              <tr key={order.id} className={index % 2 === 0 ? "bg-base-200 dark:bg-base-100 dark:text-white text-black" : ""}>
                 <th>{startIndex + index + 1}</th>
                 <td>{order.name}</td>
                 <td>{order.from}</td>
