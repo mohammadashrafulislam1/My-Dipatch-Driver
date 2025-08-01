@@ -35,7 +35,7 @@ const Chat = () => {
 
   const handleUserClick = (user) => {
     setSelectedUser(user);
-    navigate(`/chat?user=${user.id}`);
+    navigate(`/dashboard/chat?user=${user.id}`);
   };
 
   const handleSend = () => {
