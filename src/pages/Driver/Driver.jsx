@@ -90,7 +90,7 @@ const Driver = () => {
 
         {/* Center Card */}
         <div className="absolute left-1/2 transform -translate-x-1/2 top-32 
-         max-w-lg md:w-[90vw] w-[70%] bg-white bg-opacity-90 backdrop-blur-md rounded-3xl md:p-10 p-5 shadow-2xl text-center z-20">
+         max-w-lg md:w-[90vw] w-[90%] bg-white bg-opacity-90 backdrop-blur-md rounded-3xl md:p-10 p-5 shadow-2xl text-center z-20">
           <img
             src="https://i.ibb.co/TxC947Cw/thumbnail-Image-2025-07-09-at-2-10-AM-removebg-preview.png"
             alt="Logo"

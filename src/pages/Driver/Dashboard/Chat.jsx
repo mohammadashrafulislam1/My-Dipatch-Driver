@@ -107,7 +107,7 @@ const Chat = () => {
   }, [selectedFile]);
 
   return (
-    <div className="flex h-[600px] max-w-4xl mx-auto bg-white shadow-md rounded-xl overflow-hidden relative">
+    <div className="flex h-[600px] max-w-4xl mx-auto bg-white shadow-md rounded-xl overflow-hidden relative md:mt-0 mt-6">
       {/* Sidebar */}
       <div
         className={`w-full sm:w-1/3 border-r bg-gray-100 absolute sm:relative z-10 transition-transform duration-300 ${
