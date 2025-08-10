@@ -14,6 +14,7 @@ import { NavLink } from "react-router-dom";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
+import DriverNotification from "../../Components/DriverNotification";
 
 // Fix Leaflet marker icon paths
 delete L.Icon.Default.prototype._getIconUrl;
@@ -30,6 +31,7 @@ const Driver = () => {
 
   return (
     <div className="min-h-screen flex flex-col justify-between relative overflow-hidden font-sans bg-white">
+      <DriverNotification />
       {/* Top Bar and Menu */}
       <div className="absolute top-0 w-full z-10 flex justify-between items-start p-6 ">
         <div className="drawer hidden md:block">
