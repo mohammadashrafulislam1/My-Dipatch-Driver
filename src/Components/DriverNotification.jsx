@@ -14,7 +14,7 @@ export default function DriverNotification() {
   const DURATION = 20 * 1000; // 10 seconds
 
   useEffect(() => {
-    const socket = io('http://localhost:3000');
+    const socket = io('https://my-dipatch-backend.vercel.app');
     socket.emit('join', { userId: driverId, role: 'driver' });
 
     socket.on('new-ride-request', (ride) => {
@@ -65,7 +65,7 @@ export default function DriverNotification() {
 
   async function checkRideStatusAndRetry(rideId) {
     try {
-      const res = await fetch(`http://localhost:3000/api/rides/${rideId}`);
+      const res = await fetch(`https://my-dipatch-backend.vercel.app/rides/${rideId}`);
       const ride = await res.json();
       if (ride.status === "pending") {
         showNotification(ride);
