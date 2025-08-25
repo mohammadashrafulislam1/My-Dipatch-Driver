@@ -13,27 +13,32 @@ export default function DriverNotification() {
   const driverId = "6897f362d0b0f0a2da455188";
   const DURATION = 20 * 1000; // 10 seconds
 
-  useEffect(() => {
-    const socket = io('https://my-dipatch-backend.vercel.app');
-    socket.emit('join', { userId: driverId, role: 'driver' });
+  const socketRef = useRef(null);
 
-    socket.on('new-ride-request', (ride) => {
-      if (ride.status === "pending") {
-        showNotification(ride);
-      }
-    });
+useEffect(() => {
+  socketRef.current = io('https://my-dipatch-backend.onrender.com', {
+    transports: ["websocket"],
+    withCredentials: true,
+  });
 
-    socket.on("connect_error", (err) => {
-      console.error("Socket connection error:", err);
-    });
+  const socket = socketRef.current;
+  socket.emit('join', { userId: driverId, role: 'driver' });
 
-    return () => {
-      clearTimeout(timerRef.current);
-      clearTimeout(retryTimerRef.current);
-      clearInterval(progressRef.current);
-      socket.disconnect();
-    };
-  }, []);
+  socket.on('new-ride-request', (ride) => {
+    if (ride.status === "pending") {
+      showNotification(ride);
+    }
+  });
+
+  socket.on("connect_error", (err) => {
+    console.error("Socket connection error:", err);
+  });
+
+  return () => {
+    socket.disconnect();
+  };
+}, []);
+
 
   function showNotification(ride) {
     setNotification({ ...ride, timestamp: Date.now() });
@@ -65,7 +70,7 @@ export default function DriverNotification() {
 
   async function checkRideStatusAndRetry(rideId) {
     try {
-      const res = await fetch(`https://my-dipatch-backend.vercel.app/rides/${rideId}`);
+      const res = await fetch(`https://my-dipatch-backend.onrender.com/rides/${rideId}`);
       const ride = await res.json();
       if (ride.status === "pending") {
         showNotification(ride);
