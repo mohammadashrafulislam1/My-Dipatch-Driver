@@ -4,6 +4,7 @@ import { FaFacebookF } from "react-icons/fa";
 import { IoEyeOffSharp, IoEyeSharp } from "react-icons/io5";
 
 const Login = () => {
+  const { login, loading } = useAuth();
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
 
@@ -25,8 +26,18 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F4F9FF] px-4">
-      <div className="w-full max-w-md bg-white p-6 sm:p-4 rounded-2xl shadow-xl">
+    <div className="min-h-screen flex items-center justify-center bg-[#F4F9FF] px-4 relative">
+      {/* Background */}
+  <div className="absolute inset-0">
+    <img
+      src="https://i1.pickpik.com/photos/255/726/486/city-dashboard-driver-driving-preview.jpg" 
+      alt="City Background"
+      className="w-full h-full object-cover"
+    />
+    {/* Dark gradient overlay */}
+    <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/50 to-black/80"></div>
+  </div>
+      <div className="w-full max-w-md bg-white p-6 sm:p-4 rounded-2xl shadow-xl z-10">
         <img
           src="https://i.ibb.co/TxC947Cw/thumbnail-Image-2025-07-09-at-2-10-AM-removebg-preview.png"
           alt="Logo"
