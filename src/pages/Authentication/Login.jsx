@@ -1,43 +1,67 @@
 import { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import { FcGoogle } from "react-icons/fc";
 import { FaFacebookF } from "react-icons/fa";
 import { IoEyeOffSharp, IoEyeSharp } from "react-icons/io5";
+import useAuth from "../../Components/useAuth";
+import toast, { Toaster } from "react-hot-toast";
 
 const Login = () => {
   const { login, loading } = useAuth();
-  const [formData, setFormData] = useState({ email: "", password: "" });
+  const navigate = useNavigate();
+  const [formData, setFormData] = useState({ email: "", password: "", role:"driver" });
   const [showPassword, setShowPassword] = useState(false);
 
   const handleChange = (e) => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Login with:", formData);
+
+    if (!formData.email.trim()) {
+      toast.error("Email is required ❌");
+      return;
+    }
+    if (formData.password.length < 6) {
+      toast.error("Password must be at least 6 characters ❌");
+      return;
+    }
+
+    try {
+      await login(formData); // login function from useAuth
+      toast.success("Login successful ✅ Redirecting...");
+      setTimeout(() => navigate("/dashboard"), 1500);
+    } catch (err) {
+      console.error("Login error:", err.response?.data?.message || err.message);
+      toast.error(err.response?.data?.message || "Login failed ❌");
+    }
   };
 
   const handleGoogleLogin = () => {
     console.log("Login with Google");
+    // Add Google OAuth logic
   };
 
   const handleFacebookLogin = () => {
     console.log("Login with Facebook");
+    // Add Facebook OAuth logic
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#F4F9FF] px-4 relative">
+      <Toaster position="top-right" />
       {/* Background */}
-  <div className="absolute inset-0">
-    <img
-      src="https://i1.pickpik.com/photos/255/726/486/city-dashboard-driver-driving-preview.jpg" 
-      alt="City Background"
-      className="w-full h-full object-cover"
-    />
-    {/* Dark gradient overlay */}
-    <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/50 to-black/80"></div>
-  </div>
-      <div className="w-full max-w-md bg-white p-6 sm:p-4 rounded-2xl shadow-xl z-10">
+      <div className="absolute inset-0">
+        <img
+          src="https://i1.pickpik.com/photos/255/726/486/city-dashboard-driver-driving-preview.jpg"
+          alt="City Background"
+          className="w-full h-full object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/50 to-black/80"></div>
+      </div>
+
+      <div className="w-full max-w-md bg-white p-6 sm:p-4 rounded-2xl shadow-xl z-10 relative">
         <img
           src="https://i.ibb.co/TxC947Cw/thumbnail-Image-2025-07-09-at-2-10-AM-removebg-preview.png"
           alt="Logo"
@@ -80,9 +104,10 @@ const Login = () => {
 
           <button
             type="submit"
-            className="w-full bg-[#008000] text-white py-2 rounded-full font-semibold hover:bg-green-700 transition text-sm sm:text-base"
+            disabled={loading}
+            className="w-full bg-[#008000] text-white py-2 rounded-full font-semibold hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
           >
-            Login
+            {loading ? "Logging in..." : "Login"}
           </button>
         </form>
 
@@ -115,9 +140,9 @@ const Login = () => {
         {/* Extra Links */}
         <p className="text-center text-sm text-gray-600 mt-6">
           Don’t have an account?{" "}
-          <a href="/signup" className="text-[#006FFF] font-medium hover:underline">
+          <Link to="/signup" className="text-[#006FFF] font-medium hover:underline">
             Sign Up
-          </a>
+          </Link>
         </p>
       </div>
     </div>

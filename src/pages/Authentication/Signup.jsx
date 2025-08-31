@@ -13,7 +13,7 @@ const Signup = () => {
     name: "",
     email: "",
     phone: "",
-    address: "",
+    city: "",
     password: "",
     confirmPassword: "",
     role: "driver", // ✅ fixed role for driver
@@ -40,25 +40,32 @@ const Signup = () => {
     }
 
     const [firstName, ...lastNameParts] = formData.name.trim().split(" ");
-    const lastName = lastNameParts.join(" ");
+const lastName = lastNameParts.length > 0 ? lastNameParts.join(" ") : "N/A";
+
 
     const formPayload = new FormData();
     formPayload.append("firstName", firstName);
     formPayload.append("lastName", lastName);
     formPayload.append("email", formData.email);
     formPayload.append("phone", formData.phone);
-    formPayload.append("address", formData.address);
+    formPayload.append("city", formData.city);
     formPayload.append("password", formData.password);
     formPayload.append("role", formData.role);
     if (profileImage) formPayload.append("profileImage", profileImage);
 
     try {
+      // After building formPayload
+console.log("FormData contents:");
+for (let pair of formPayload.entries()) {
+  console.log(pair[0], pair[1]);
+}
+
       await signup(formPayload);
       toast.success("Driver signup successful 🚖 Redirecting...");
       setTimeout(() => navigate("/login"), 1500);
     } catch (err) {
-      console.error("Driver Signup error:", err.response?.data?.error || err.message);
-      toast.error(err.response?.data?.error || "Error signing up ❌");
+      console.error("Driver Signup error:", err.response?.data?.message || err.message);
+      toast.error(err.response?.data?.message || "Error signing up ❌");
     }
   };
 
@@ -137,15 +144,15 @@ const Signup = () => {
             />
           </div>
 
-          {/* Address */}
+          {/* city */}
           <div className="relative">
             <FaMapMarkerAlt className="absolute top-3 left-3 text-gray-400" />
             <input
               type="text"
-              name="address"
-              placeholder="Address"
+              name="city"
+              placeholder="city"
               className="w-full pl-10 pr-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#006FFF]"
-              value={formData.address}
+              value={formData.city}
               onChange={handleChange}
               required
             />
