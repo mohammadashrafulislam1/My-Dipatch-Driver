@@ -25,6 +25,7 @@ useEffect(() => {
   socket.emit('join', { userId: driverId, role: 'driver' });
 
   socket.on('new-ride-request', (ride) => {
+    console.log(ride)
     if (ride.status === "pending") {
       showNotification(ride);
     }
@@ -70,8 +71,10 @@ useEffect(() => {
 
   async function checkRideStatusAndRetry(rideId) {
     try {
-      const res = await fetch(`https://my-dipatch-backend.onrender.com/rides/${rideId}`);
+      const res = await fetch(`https://my-dipatch-backend.onrender.com/api/rides/${rideId}`);
+      console.log(res);
       const ride = await res.json();
+      console.log(ride);
       if (ride.status === "pending") {
         showNotification(ride);
       }
@@ -121,17 +124,34 @@ useEffect(() => {
           <span>{notification.eta || "15 min"} ({notification.distance || "1.3 mi"}) total</span>
         </div>
 
-        {/* Pickup & Dropoff */}
-        <div className="space-y-2">
-          <div className="flex items-start space-x-2">
-            <MapPin size={18} className="text-green-500" />
-            <span>{notification.pickup?.address}</span>
-          </div>
-          <div className="flex items-start space-x-2">
-            <MapPin size={18} className="text-red-500" />
-            <span>{notification.dropoff?.address}</span>
-          </div>
+        {/* Pickup & Dropoff & Midway Stops */}
+<div className="space-y-2">
+  {/* Pickup */}
+  <div className="flex items-start space-x-2">
+    <MapPin size={18} className="text-green-500" />
+    <span>{notification.pickup?.address}</span>
+  </div>
+
+  {/* Midway Stops */}
+  {notification.midwayStops?.length > 0 && (
+    <div className="pl-6 space-y-1">
+      <h5 className="text-sm font-semibold text-yellow-400">Midway:{notification.midwayStops.length > 1 ? "s" : ""}</h5>
+      {notification.midwayStops.map((stop, index) => (
+        <div key={index} className="flex items-start space-x-2">
+          <MapPin size={18} className="text-yellow-500" />
+          <span>{stop.address}</span>
         </div>
+      ))}
+    </div>
+  )}
+
+  {/* Dropoff */}
+  <div className="flex items-start space-x-2">
+    <MapPin size={18} className="text-red-500" />
+    <span>{notification.dropoff?.address}</span>
+  </div>
+</div>
+
 
         {/* Buttons */}
         <div className="flex space-x-2">
