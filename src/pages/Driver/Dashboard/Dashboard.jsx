@@ -25,7 +25,8 @@ import { SlHome } from "react-icons/sl";
 import { TbBrandGoogleAnalytics } from "react-icons/tb";
 import { TfiAlignLeft } from "react-icons/tfi";
 import { VscSignOut } from "react-icons/vsc";
-import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
+import useAuth from "../../../Components/useAuth";
 
 const notifications = [
   { id: 1, text: "You have a new message from Alex.", timeAgo: "2h ago" },
@@ -50,7 +51,16 @@ const Dashboard = () => {
   const [showMessages, setShowMessages] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
+  const {user, loading, logout} = useAuth();
   
+  const handleLogout = async () => {
+    try {
+      await logout();          // Call your existing logout function
+      window.location.href = "/"; // Full page reload to landing page
+    } catch (err) {
+      console.error(err);
+    }
+  };
   const pageTitles = {
     "/dashboard": "Dashboard",
     "/dashboard/orders": "Order Lists",
@@ -116,14 +126,32 @@ const Dashboard = () => {
           ))}
         </div>
         <div className="divider mt-6 mb-2" />
-        <NavLink
-          to="/logout"
-          className="flex items-center gap-2 text-gray-700 px-3 py-2 hover:bg-gray-100 rounded-md"
-          onClick={() => setSidebarOpen(false)}
-        >
-          <VscSignOut className="text-[16px]" />
-          Sign Out
-        </NavLink>
+        {user ? (
+  <div
+    className="pl-[12px] pt-[6px] poppins-regular flex gap-2 items-center btn cursor-pointer"
+    onClick={handleLogout}
+  >
+    {user.profileImage ? (
+      <img
+        src={user.profileImage}
+        alt="Profile"
+        className="w-7 h-7 rounded-full object-cover"
+      />
+    ) : (
+      <VscSignOut className="text-[16px]" />
+    )}
+    <span className="ml-2">
+      {loading ? "Signing Out..." : "Sign Out"}
+    </span>
+  </div>
+) : (
+  <Link
+    to="/signup"
+    className="pl-[12px] pt-[6px] pb-[6px] poppins-regular flex gap-2 items-center btn cursor-pointer bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+  >
+    Get Started
+  </Link>
+)}
       </div>
 
       {/* ==== MOBILE BOTTOM NAVIGATION ==== */}

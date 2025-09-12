@@ -36,7 +36,7 @@ const Driver = () => {
   const {user, loading, logout} = useAuth();
   const [isActive, setIsActive] = useState(false);
   const [statusLoading, setStatusLoading] = useState(true); // NEW
- console.log(cityName, position)
+ console.log(user?.profileImage)
   const handleStartRide = async () => {
     try {
       await axios.put(`${endPoint}/user/${user._id}/status`, { status: "active" });
@@ -57,7 +57,10 @@ const Driver = () => {
 // Fetch city coordinates dynamically
 useEffect(() => {
   const fetchUserStatus = async () => {
-    if (!user) return;
+    if (!user) {
+      setStatusLoading(false); // Stop loading if guest
+      return;
+    }
 
     setStatusLoading(true); // start loading
     try {
@@ -153,13 +156,34 @@ useEffect(() => {
                 </NavLink>
               ))}
               <div className="divider mt-[20px] mb-0"></div>
-              <div
-                className="pl-[12px] pt-[6px] poppins-regular flex gap-2 items-center btn"
-                onClick={handleLogout}
-              >
-                <VscSignOut className="text-[16px]" />
-                {loading ? "Signing Out..." : <> Sign Out</>}
-              </div>
+              {user ? (
+  <div
+    className="pl-[12px] pt-[6px] poppins-regular flex gap-2 items-center btn cursor-pointer"
+    onClick={handleLogout}
+  >
+    {user.profileImage ? (
+      <img
+        src={user.profileImage}
+        alt="Profile"
+        className="w-7 h-7 rounded-full object-cover"
+      />
+    ) : (
+      <VscSignOut className="text-[16px]" />
+    )}
+    <span className="ml-2">
+      {loading ? "Signing Out..." : "Sign Out"}
+    </span>
+  </div>
+) : (
+  <Link
+    to="/signup"
+    className="pl-[12px] pt-[6px] pb-[6px] poppins-regular flex gap-2 items-center btn cursor-pointer bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+  >
+    Get Started
+  </Link>
+)}
+
+
             </ul>
           </div>
         </div>
@@ -230,6 +254,12 @@ useEffect(() => {
       bg-white/40 backdrop-blur-md border border-white/30
       rounded-3xl md:p-10 p-5 shadow-2xl text-center z-20"
   >
+    
+    <img
+        src="https://i.ibb.co/TxC947Cw/thumbnail-Image-2025-07-09-at-2-10-AM-removebg-preview.png"
+        alt="Logo"
+        className="md:w-40 w-20 mx-auto md:mb-6 mb-2"
+      />
     <h1 className="md:text-4xl text-2xl font-extrabold text-gray-900 md:mb-4 mb-2 poppins-semibold">
       Become a Driver
     </h1>
