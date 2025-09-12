@@ -33,7 +33,7 @@ const Driver = () => {
   const [position, setPosition] = useState([50.4452, -104.6189]); // default Regina
   const [cityName, setCityName] = useState("Regina, SK");
   const [showDropdown, setShowDropdown] = useState(false);
-  const {user, loading} = useAuth();
+  const {user, loading, logout} = useAuth();
   const [isActive, setIsActive] = useState(false);
   const [statusLoading, setStatusLoading] = useState(true); // NEW
  console.log(cityName, position)
@@ -46,6 +46,14 @@ const Driver = () => {
     }
   };
   
+  const handleLogout = async () => {
+    try {
+      await logout();          // Call your existing logout function
+      window.location.href = "/"; // Full page reload to landing page
+    } catch (err) {
+      console.error(err);
+    }
+  };
 // Fetch city coordinates dynamically
 useEffect(() => {
   const fetchUserStatus = async () => {
@@ -145,13 +153,13 @@ useEffect(() => {
                 </NavLink>
               ))}
               <div className="divider mt-[20px] mb-0"></div>
-              <NavLink
-                to="/logout"
-                className="pl-[12px] pt-[6px] poppins-regular flex gap-2 items-center"
+              <div
+                className="pl-[12px] pt-[6px] poppins-regular flex gap-2 items-center btn"
+                onClick={handleLogout}
               >
                 <VscSignOut className="text-[16px]" />
-                Sign Out
-              </NavLink>
+                {loading ? "Signing Out..." : <> Sign Out</>}
+              </div>
             </ul>
           </div>
         </div>
