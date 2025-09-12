@@ -34,38 +34,59 @@ const Driver = () => {
   const [cityName, setCityName] = useState("Regina, SK");
   const [showDropdown, setShowDropdown] = useState(false);
   const {user, loading} = useAuth();
-  const [isActive, setIsActive] = useState(true);
-
+  const [isActive, setIsActive] = useState(false);
+  const [statusLoading, setStatusLoading] = useState(true); // NEW
+ console.log(cityName, position)
   const handleStartRide = async () => {
     try {
       await axios.put(`${endPoint}/user/${user._id}/status`, { status: "active" });
-      setIsActive(true);
+      setIsActive(true); // update UI immediately
     } catch (err) {
       console.error("Error activating driver:", err);
     }
   };
+  
 // Fetch city coordinates dynamically
 useEffect(() => {
-  const fetchCityCoords = async () => {
-    if (user?.city) {
-      try {
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-            user.city
-          )}`
-        );
-        const data = await response.json();
-        if (data && data.length > 0) {
-          setPosition([parseFloat(data[0].lat), parseFloat(data[0].lon)]);
-          setCityName(user.city);
+  const fetchUserStatus = async () => {
+    if (!user) return;
+
+    setStatusLoading(true); // start loading
+    try {
+     console.log(user)
+      // Set city position if available
+      if (user?.city) {
+        try {
+          const geoRes = await fetch(
+            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(user?.city)}`
+          );
+          const geoData = await geoRes.json();
+          if (geoData && geoData.length > 0) {
+            setPosition([parseFloat(geoData[0].lat), parseFloat(geoData[0].lon)]);
+            setCityName(user?.city);
+          }
+        } catch (err) {
+          console.error("Error fetching city coordinates:", err);
         }
-      } catch (err) {
-        console.error("Error fetching city coordinates:", err);
       }
+
+      // Set active status
+      if (user?.status === "active") {
+        setIsActive(true);
+      } else {
+        setIsActive(false);
+      }
+    } catch (err) {
+      console.error("Error fetching user status:", err);
+      setIsActive(false);
+    } finally {
+      setStatusLoading(false); // stop loading
     }
   };
-  fetchCityCoords();
-}, [user?.city]);
+
+  fetchUserStatus();
+}, [user]);
+
 
   return (
     <div className="min-h-screen flex flex-col justify-between relative overflow-hidden font-sans bg-white">
@@ -137,7 +158,14 @@ useEffect(() => {
 
       {/* Center Card */}
       {/* === Center UI === */}
-{user ? (
+ {statusLoading ? (
+  // Show loader while fetching status
+  <div className="absolute top-32 left-1/2 -translate-x-1/2 z-30">
+    <span className="bg-gray-200 text-gray-700 px-6 py-2 rounded-full shadow-lg font-semibold animate-pulse">
+      Checking status...
+    </span>
+  </div>
+) : user ? (
   isActive ? (
     <>
       {/* ✅ Active Status Badge */}
