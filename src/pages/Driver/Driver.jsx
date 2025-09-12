@@ -201,7 +201,7 @@ useEffect(() => {
   isActive ? (
     <>
       {/* ✅ Active Status Badge */}
-      <div className="absolute top-6 left-1/2 -translate-x-1/2 z-30">
+      <div className="absolute top-6 left-20 md:left-1/2 md:-translate-x-1/2 z-30">
         <span className="bg-green-600 text-white px-6 py-2 rounded-full shadow-lg font-semibold">
           🚖 You are Active – Waiting for Rides
         </span>
@@ -398,7 +398,7 @@ useEffect(() => {
 
 
 {/* Live Map */}
-      <div className="absolute bottom-0 w-full h-[100%] lg:h-[540px] md:h-[430px] overflow-hidden z-0 rounded-t-3xl shadow-inner">
+      <div className="absolute bottom-0 w-full h-[80%] lg:h-[540px] md:h-[430px] overflow-hidden z-0 rounded-t-3xl shadow-inner">
         <MapContainer center={position} zoom={13} className="w-full h-full">
           <TileLayer
             attribution='&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors'
