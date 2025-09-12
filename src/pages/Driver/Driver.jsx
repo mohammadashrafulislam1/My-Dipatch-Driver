@@ -34,7 +34,7 @@ const Driver = () => {
   const [cityName, setCityName] = useState("Regina, SK");
   const [showDropdown, setShowDropdown] = useState(false);
   const {user, loading} = useAuth();
-  const [isActive, setIsActive] = useState(user?.status === "active");
+  const [isActive, setIsActive] = useState(true);
 
   const handleStartRide = async () => {
     try {
@@ -70,6 +70,13 @@ useEffect(() => {
   return (
     <div className="min-h-screen flex flex-col justify-between relative overflow-hidden font-sans bg-white">
       <DriverNotification />
+
+{isActive && (
+  <FloatingDeactivateBtn
+    userId={user?._id}
+    onDeactivated={() => setIsActive(false)}
+  />
+)}
       {/* Top Bar and Menu */}
       <div className="absolute top-0 w-full z-10 flex justify-between items-start p-6 ">
         <div className="drawer hidden md:block">
@@ -129,64 +136,80 @@ useEffect(() => {
         </div>
 
       {/* Center Card */}
-      <div
-  className="absolute left-1/2 transform -translate-x-1/2 top-32
-    max-w-lg md:w-[90vw] w-[90%] 
-    bg-white/40 backdrop-blur-md border border-white/30
-    rounded-3xl md:p-10 p-5 shadow-2xl text-center z-20"
->
-        <img
-          src="https://i.ibb.co/TxC947Cw/thumbnail-Image-2025-07-09-at-2-10-AM-removebg-preview.png"
-          alt="Logo"
-          className="md:w-40 w-20 mx-auto md:mb-6 mb-2"
-        />
-
-        {user ? (
-          <>
-            <h1 className="md:text-4xl text-2xl font-bold text-gray-900 md:mb-4 mb-2 poppins-semibold">
-              Welcome, <br /> 
-              <span className="md:text-3xl text-xl font-semibold">{user.firstName} {user.lastName}!</span>
-            </h1>
-            <p className="md:text-[16px] text-[14px] text-gray-700 poppins-regular md:mb-2 mb-3 px-6">
-              Your city: {cityName}.
-            </p>
-            {user && !isActive && (
-        <button
-          onClick={handleStartRide}
-          className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 
-            hover:to-green-600 text-white md:text-lg text-md font-semibold 
-            poppins-regular py-3 px-8 rounded-full shadow-lg transition 
-            duration-300 transform hover:scale-105"
-        >
-          Start Ride
-        </button>
-      )}
-
-      {isActive && (
-        <FloatingDeactivateBtn
-          userId={user._id}
-          onDeactivated={() => setIsActive(false)}
-        />
-      )}
-          </>
-        ) : (
-          <>
-            <h1 className="md:text-4xl text-2xl font-extrabold text-gray-900 md:mb-4 mb-2 poppins-semibold">
-              Become a Driver
-            </h1>
-            <p className="md:text-lg text-[14px] text-gray-700 poppins-regular md:mb-8 mb-3 px-6">
-              Start earning now by errands or making deliveries.
-            </p>
-            <Link to="/login">
-              <button className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 
-                hover:to-blue-600 text-white md:text-lg text-md font-semibold poppins-regular py-3 px-8 
-                rounded-full shadow-lg transition duration-300 transform hover:scale-105">
-                Get Started
-              </button>
-            </Link>
-          </>
-        )}
+      {/* === Center UI === */}
+{user ? (
+  isActive ? (
+    <>
+      {/* ✅ Active Status Badge */}
+      <div className="absolute top-6 left-1/2 -translate-x-1/2 z-30">
+        <span className="bg-green-600 text-white px-6 py-2 rounded-full shadow-lg font-semibold">
+          🚖 You are Active – Waiting for Rides
+        </span>
       </div>
+
+      {/* ✅ Floating Deactivate Button */}
+      <FloatingDeactivateBtn
+        userId={user._id}
+        onDeactivated={() => setIsActive(false)}
+      />
+    </>
+  ) : (
+    /* ✅ Glass Card (only when inactive) */
+    <div
+      className="absolute left-1/2 transform -translate-x-1/2 top-32
+        max-w-lg md:w-[90vw] w-[90%] 
+        bg-white/40 backdrop-blur-md border border-white/30
+        rounded-3xl md:p-10 p-5 shadow-2xl text-center z-20"
+    >
+      <img
+        src="https://i.ibb.co/TxC947Cw/thumbnail-Image-2025-07-09-at-2-10-AM-removebg-preview.png"
+        alt="Logo"
+        className="md:w-40 w-20 mx-auto md:mb-6 mb-2"
+      />
+      <h1 className="md:text-4xl text-2xl font-bold text-gray-900 md:mb-4 mb-2 poppins-semibold">
+        Welcome, <br />
+        <span className="md:text-3xl text-xl font-semibold">
+          {user.firstName} {user.lastName}!
+        </span>
+      </h1>
+      <p className="md:text-[16px] text-[14px] text-gray-700 poppins-regular md:mb-2 mb-3 px-6">
+        Your city: {cityName}.
+      </p>
+      <button
+        onClick={handleStartRide}
+        className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 
+          hover:to-green-600 text-white md:text-lg text-md font-semibold 
+          poppins-regular py-3 px-8 rounded-full shadow-lg transition 
+          duration-300 transform hover:scale-105"
+      >
+        Start Ride
+      </button>
+    </div>
+  )
+) : (
+  /* Guest / Not Logged In */
+  <div
+    className="absolute left-1/2 transform -translate-x-1/2 top-32
+      max-w-lg md:w-[90vw] w-[90%] 
+      bg-white/40 backdrop-blur-md border border-white/30
+      rounded-3xl md:p-10 p-5 shadow-2xl text-center z-20"
+  >
+    <h1 className="md:text-4xl text-2xl font-extrabold text-gray-900 md:mb-4 mb-2 poppins-semibold">
+      Become a Driver
+    </h1>
+    <p className="md:text-lg text-[14px] text-gray-700 poppins-regular md:mb-8 mb-3 px-6">
+      Start earning now by errands or making deliveries.
+    </p>
+    <Link to="/login">
+      <button className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 
+        hover:to-blue-600 text-white md:text-lg text-md font-semibold poppins-regular py-3 px-8 
+        rounded-full shadow-lg transition duration-300 transform hover:scale-105">
+        Get Started
+      </button>
+    </Link>
+  </div>
+)}
+
 
       </div>
 
