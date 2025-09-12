@@ -23,10 +23,10 @@ const Login = () => {
       toast.error("Email is required ❌");
       return;
     }
-    if (formData.password.length < 6) {
-      toast.error("Password must be at least 6 characters ❌");
-      return;
-    }
+    // if (formData.password.length < 6) {
+    //   toast.error("Password must be at least 6 characters ❌");
+    //   return;
+    // }
 
     try {
       await login(formData); // login function from useAuth

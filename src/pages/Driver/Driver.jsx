@@ -10,11 +10,12 @@ import { SlHome } from "react-icons/sl";
 import { TbBrandGoogleAnalytics } from "react-icons/tb";
 import { TfiAlignLeft } from "react-icons/tfi";
 import { VscSignOut } from "react-icons/vsc";
-import { NavLink } from "react-router-dom";
+import { Link, NavLink } from "react-router-dom";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import DriverNotification from "../../Components/DriverNotification";
+import useAuth from "../../Components/useAuth";
 
 // Fix Leaflet marker icon paths
 delete L.Icon.Default.prototype._getIconUrl;
@@ -28,6 +29,7 @@ L.Icon.Default.mergeOptions({
 const Driver = () => {
   const position = [50.4452, -104.6189]; // Regina, SK
   const [showDropdown, setShowDropdown] = useState(false);
+  const {user, loading} = useAuth();
 
   return (
     <div className="min-h-screen flex flex-col justify-between relative overflow-hidden font-sans bg-white">
@@ -90,26 +92,46 @@ const Driver = () => {
           </div>
         </div>
 
-        {/* Center Card */}
-        <div className="absolute left-1/2 transform -translate-x-1/2 top-32 
-         max-w-lg md:w-[90vw] w-[90%] bg-white bg-opacity-90 backdrop-blur-md rounded-3xl md:p-10 p-5 shadow-2xl text-center z-20">
-          <img
-            src="https://i.ibb.co/TxC947Cw/thumbnail-Image-2025-07-09-at-2-10-AM-removebg-preview.png"
-            alt="Logo"
-            className="md:w-40 w-20 mx-auto md:mb-6 mb-2"
-          />
-          <h1 className="md:text-4xl text-2xl font-extrabold text-gray-900 md:mb-4 mb-2 poppins-semibold">
-            Become a Driver
-          </h1>
-          <p className="md:text-lg text-[14px] text-gray-700 poppins-regular md:mb-8 mb-3 px-6">
-            Start earning now by errands or making deliveries.
-          </p>
-          <button className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 
-          hover:to-blue-600 text-white md:text-lg text-md font-semibold poppins-regular py-3 px-8 rounded-full shadow-lg 
-          transition duration-300 transform hover:scale-105">
-            Get Started
-          </button>
-        </div>
+       {/* Center Card */}
+<div className="absolute left-1/2 transform -translate-x-1/2 top-32 
+ max-w-lg md:w-[90vw] w-[90%] bg-white bg-opacity-90 backdrop-blur-md rounded-3xl md:p-10 p-5 shadow-2xl text-center z-20">
+  <img
+    src="https://i.ibb.co/TxC947Cw/thumbnail-Image-2025-07-09-at-2-10-AM-removebg-preview.png"
+    alt="Logo"
+    className="md:w-40 w-20 mx-auto md:mb-6 mb-2"
+  />
+
+  {user ? (
+    <>
+      <h1 className="md:text-4xl text-2xl font-extrabold text-gray-900 md:mb-4 mb-2 poppins-semibold">
+        Welcome, <br /> {user.firstName} {user.lastName}!
+      </h1>
+      <p className="md:text-lg text-[14px] text-gray-700 poppins-regular md:mb-8 mb-3 px-6">
+        Your city: {user.city || "Not provided"}.
+      </p>
+      <button className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 
+      hover:to-green-600 text-white md:text-lg text-md font-semibold poppins-regular py-3 px-8 rounded-full shadow-lg 
+      transition duration-300 transform hover:scale-105">
+        Start Ride
+      </button>
+    </>
+  ) : (
+    <>
+      <h1 className="md:text-4xl text-2xl font-extrabold text-gray-900 md:mb-4 mb-2 poppins-semibold">
+        Become a Driver
+      </h1>
+      <p className="md:text-lg text-[14px] text-gray-700 poppins-regular md:mb-8 mb-3 px-6">
+        Start earning now by errands or making deliveries.
+      </p>
+      <Link to="/login"><button className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 
+      hover:to-blue-600 text-white md:text-lg text-md font-semibold poppins-regular py-3 px-8 rounded-full shadow-lg 
+      transition duration-300 transform hover:scale-105">
+        Get Started
+      </button></Link>
+    </>
+  )}
+</div>
+
       </div>
 
       {/* ==== MOBILE BOTTOM NAVIGATION ==== */}
