@@ -4,6 +4,7 @@ import { FaUser, FaEnvelope, FaPhone, FaLock, FaMapMarkerAlt, FaImage } from "re
 import { useNavigate } from "react-router-dom";
 import toast, { Toaster } from "react-hot-toast";
 import useAuth from "../../Components/useAuth";
+import { GoogleMap, LoadScript, Autocomplete } from "@react-google-maps/api";
 
 const Signup = () => {
   const { signup, loading } = useAuth();
@@ -16,12 +17,13 @@ const Signup = () => {
     city: "",
     password: "",
     confirmPassword: "",
-    role: "driver", // ✅ fixed role for driver
+    role: "driver",
   });
 
   const [profileImage, setProfileImage] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [autocomplete, setAutocomplete] = useState(null);
 
   const handleChange = (e) => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -29,6 +31,18 @@ const Signup = () => {
 
   const handleImageChange = (e) => {
     setProfileImage(e.target.files[0]);
+  };
+
+  const onLoad = (autoC) => {
+    setAutocomplete(autoC);
+  };
+
+  const onPlaceChanged = () => {
+    if (autocomplete) {
+      const place = autocomplete.getPlace();
+      const cityName = place.formatted_address || place.name;
+      setFormData((prev) => ({ ...prev, city: cityName }));
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -40,8 +54,7 @@ const Signup = () => {
     }
 
     const [firstName, ...lastNameParts] = formData.name.trim().split(" ");
-const lastName = lastNameParts.length > 0 ? lastNameParts.join(" ") : "N/A";
-
+    const lastName = lastNameParts.length > 0 ? lastNameParts.join(" ") : "N/A";
 
     const formPayload = new FormData();
     formPayload.append("firstName", firstName);
@@ -54,12 +67,6 @@ const lastName = lastNameParts.length > 0 ? lastNameParts.join(" ") : "N/A";
     if (profileImage) formPayload.append("profileImage", profileImage);
 
     try {
-      // After building formPayload
-console.log("FormData contents:");
-for (let pair of formPayload.entries()) {
-  console.log(pair[0], pair[1]);
-}
-
       await signup(formPayload);
       toast.success("Driver signup successful 🚖 Redirecting...");
       setTimeout(() => navigate("/login"), 1500);
@@ -144,18 +151,25 @@ for (let pair of formPayload.entries()) {
             />
           </div>
 
-          {/* city */}
+          {/* City with Google Autocomplete */}
           <div className="relative">
             <FaMapMarkerAlt className="absolute top-3 left-3 text-gray-400" />
-            <input
-              type="text"
-              name="city"
-              placeholder="city"
-              className="w-full pl-10 pr-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#006FFF]"
-              value={formData.city}
-              onChange={handleChange}
-              required
-            />
+            <LoadScript
+              googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}
+              libraries={["places"]}
+            >
+              <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}>
+                <input
+                  type="text"
+                  placeholder="Enter your city/location"
+                  className="w-full pl-10 pr-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#006FFF]"
+                  value={formData.city}
+                  onChange={handleChange}
+                  name="city"
+                  required
+                />
+              </Autocomplete>
+            </LoadScript>
           </div>
 
           {/* Profile Image */}

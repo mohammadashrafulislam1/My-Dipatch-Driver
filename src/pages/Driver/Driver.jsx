@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { BiSupport, BiWalletAlt } from "react-icons/bi";
 import { BsCashCoin, BsChatLeftDots } from "react-icons/bs";
 import { FaCar, FaMapMarkerAlt } from "react-icons/fa";
@@ -16,6 +16,9 @@ import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import DriverNotification from "../../Components/DriverNotification";
 import useAuth from "../../Components/useAuth";
+import { endPoint } from "../../Components/ForAPIs";
+import FloatingDeactivateBtn from "../../Components/FloatingDeactivateBtn";
+import axios from "axios";
 
 // Fix Leaflet marker icon paths
 delete L.Icon.Default.prototype._getIconUrl;
@@ -27,9 +30,42 @@ L.Icon.Default.mergeOptions({
 });
 
 const Driver = () => {
-  const position = [50.4452, -104.6189]; // Regina, SK
+  const [position, setPosition] = useState([50.4452, -104.6189]); // default Regina
+  const [cityName, setCityName] = useState("Regina, SK");
   const [showDropdown, setShowDropdown] = useState(false);
   const {user, loading} = useAuth();
+  const [isActive, setIsActive] = useState(user?.status === "active");
+
+  const handleStartRide = async () => {
+    try {
+      await axios.put(`${endPoint}/user/${user._id}/status`, { status: "active" });
+      setIsActive(true);
+    } catch (err) {
+      console.error("Error activating driver:", err);
+    }
+  };
+// Fetch city coordinates dynamically
+useEffect(() => {
+  const fetchCityCoords = async () => {
+    if (user?.city) {
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+            user.city
+          )}`
+        );
+        const data = await response.json();
+        if (data && data.length > 0) {
+          setPosition([parseFloat(data[0].lat), parseFloat(data[0].lon)]);
+          setCityName(user.city);
+        }
+      } catch (err) {
+        console.error("Error fetching city coordinates:", err);
+      }
+    }
+  };
+  fetchCityCoords();
+}, [user?.city]);
 
   return (
     <div className="min-h-screen flex flex-col justify-between relative overflow-hidden font-sans bg-white">
@@ -92,45 +128,65 @@ const Driver = () => {
           </div>
         </div>
 
-       {/* Center Card */}
-<div className="absolute left-1/2 transform -translate-x-1/2 top-32 
- max-w-lg md:w-[90vw] w-[90%] bg-white bg-opacity-90 backdrop-blur-md rounded-3xl md:p-10 p-5 shadow-2xl text-center z-20">
-  <img
-    src="https://i.ibb.co/TxC947Cw/thumbnail-Image-2025-07-09-at-2-10-AM-removebg-preview.png"
-    alt="Logo"
-    className="md:w-40 w-20 mx-auto md:mb-6 mb-2"
-  />
+      {/* Center Card */}
+      <div
+  className="absolute left-1/2 transform -translate-x-1/2 top-32
+    max-w-lg md:w-[90vw] w-[90%] 
+    bg-white/40 backdrop-blur-md border border-white/30
+    rounded-3xl md:p-10 p-5 shadow-2xl text-center z-20"
+>
+        <img
+          src="https://i.ibb.co/TxC947Cw/thumbnail-Image-2025-07-09-at-2-10-AM-removebg-preview.png"
+          alt="Logo"
+          className="md:w-40 w-20 mx-auto md:mb-6 mb-2"
+        />
 
-  {user ? (
-    <>
-      <h1 className="md:text-4xl text-2xl font-extrabold text-gray-900 md:mb-4 mb-2 poppins-semibold">
-        Welcome, <br /> {user.firstName} {user.lastName}!
-      </h1>
-      <p className="md:text-lg text-[14px] text-gray-700 poppins-regular md:mb-8 mb-3 px-6">
-        Your city: {user.city || "Not provided"}.
-      </p>
-      <button className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 
-      hover:to-green-600 text-white md:text-lg text-md font-semibold poppins-regular py-3 px-8 rounded-full shadow-lg 
-      transition duration-300 transform hover:scale-105">
-        Start Ride
-      </button>
-    </>
-  ) : (
-    <>
-      <h1 className="md:text-4xl text-2xl font-extrabold text-gray-900 md:mb-4 mb-2 poppins-semibold">
-        Become a Driver
-      </h1>
-      <p className="md:text-lg text-[14px] text-gray-700 poppins-regular md:mb-8 mb-3 px-6">
-        Start earning now by errands or making deliveries.
-      </p>
-      <Link to="/login"><button className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 
-      hover:to-blue-600 text-white md:text-lg text-md font-semibold poppins-regular py-3 px-8 rounded-full shadow-lg 
-      transition duration-300 transform hover:scale-105">
-        Get Started
-      </button></Link>
-    </>
-  )}
-</div>
+        {user ? (
+          <>
+            <h1 className="md:text-4xl text-2xl font-bold text-gray-900 md:mb-4 mb-2 poppins-semibold">
+              Welcome, <br /> 
+              <span className="md:text-3xl text-xl font-semibold">{user.firstName} {user.lastName}!</span>
+            </h1>
+            <p className="md:text-[16px] text-[14px] text-gray-700 poppins-regular md:mb-2 mb-3 px-6">
+              Your city: {cityName}.
+            </p>
+            {user && !isActive && (
+        <button
+          onClick={handleStartRide}
+          className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 
+            hover:to-green-600 text-white md:text-lg text-md font-semibold 
+            poppins-regular py-3 px-8 rounded-full shadow-lg transition 
+            duration-300 transform hover:scale-105"
+        >
+          Start Ride
+        </button>
+      )}
+
+      {isActive && (
+        <FloatingDeactivateBtn
+          userId={user._id}
+          onDeactivated={() => setIsActive(false)}
+        />
+      )}
+          </>
+        ) : (
+          <>
+            <h1 className="md:text-4xl text-2xl font-extrabold text-gray-900 md:mb-4 mb-2 poppins-semibold">
+              Become a Driver
+            </h1>
+            <p className="md:text-lg text-[14px] text-gray-700 poppins-regular md:mb-8 mb-3 px-6">
+              Start earning now by errands or making deliveries.
+            </p>
+            <Link to="/login">
+              <button className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 
+                hover:to-blue-600 text-white md:text-lg text-md font-semibold poppins-regular py-3 px-8 
+                rounded-full shadow-lg transition duration-300 transform hover:scale-105">
+                Get Started
+              </button>
+            </Link>
+          </>
+        )}
+      </div>
 
       </div>
 
@@ -252,32 +308,27 @@ const Driver = () => {
 </div>
 
 
-      {/* Live Map - Regina, SK */}
+{/* Live Map */}
       <div className="absolute bottom-0 w-full h-[100%] lg:h-[540px] md:h-[430px] overflow-hidden z-0 rounded-t-3xl shadow-inner">
-        <MapContainer
-          center={position}
-          zoom={13}
-          scrollWheelZoom={false}
-          className="w-full h-full"
-        >
+        <MapContainer center={position} zoom={13} className="w-full h-full">
           <TileLayer
             attribution='&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           <Marker position={position}>
-            <Popup>Regina, SK - Start Driving!</Popup>
+            <Popup>{cityName} - Start Driving!</Popup>
           </Marker>
         </MapContainer>
 
         {/* Car Icon */}
-  <div className="absolute left-12 bottom-12 z-[1000] bg-blue-600 p-4 rounded-full text-white text-3xl shadow-xl animate-bounce">
-    <FaCar />
-  </div>
+        <div className="absolute left-12 bottom-12 z-[1000] bg-blue-600 p-4 rounded-full text-white text-3xl shadow-xl animate-bounce">
+          <FaCar />
+        </div>
 
-  {/* Location Pin Icon */}
-  <div className="absolute right-12 top-12 z-[1000] bg-black p-4 rounded-full text-white text-3xl shadow-xl animate-pulse">
-    <FaMapMarkerAlt />
-  </div>
+        {/* Location Pin */}
+        <div className="absolute right-12 top-12 z-[1000] bg-black p-4 rounded-full text-white text-3xl shadow-xl animate-pulse">
+          <FaMapMarkerAlt />
+        </div>
       </div>
     </div>
   );
