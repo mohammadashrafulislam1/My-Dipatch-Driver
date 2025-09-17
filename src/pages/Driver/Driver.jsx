@@ -101,7 +101,8 @@ useEffect(() => {
 
   return (
     <div className="min-h-screen flex flex-col justify-between relative overflow-hidden font-sans bg-white">
-      <DriverNotification />
+      <DriverNotification isActive={isActive} />
+
 
 {isActive && (
   <FloatingDeactivateBtn

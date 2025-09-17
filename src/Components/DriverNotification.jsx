@@ -1,52 +1,65 @@
-import { Clock, MapPin } from 'lucide-react';
-import { useEffect, useState, useRef } from 'react';
-import io from 'socket.io-client';
+import { Clock, MapPin } from "lucide-react";
+import { useEffect, useState, useRef } from "react";
+import io from "socket.io-client";
+import useAuth from "./useAuth";
 
-export default function DriverNotification() {
-  const [notification, setNotification] = useState(null);
+export default function DriverNotification({ isActive }) {
+  const { user } = useAuth();
+  const [queue, setQueue] = useState([]); // queue of rides
   const [isVisible, setIsVisible] = useState(false);
-  const [progress, setProgress] = useState(100); // % for timer bar
+  const [progress, setProgress] = useState(100);
+
   const timerRef = useRef(null);
-  const retryTimerRef = useRef(null);
   const progressRef = useRef(null);
-
-  const driverId = "6897f362d0b0f0a2da455188";
-  const DURATION = 20 * 1000; // 10 seconds
-
   const socketRef = useRef(null);
 
-useEffect(() => {
-  socketRef.current = io('https://my-dipatch-backend.onrender.com', {
-    transports: ["websocket"],
-    withCredentials: true,
-  });
+  const DURATION = 20 * 1000; // 20 seconds
 
-  const socket = socketRef.current;
-  socket.emit('join', { userId: driverId, role: 'driver' });
+  // Connect socket
+  useEffect(() => {
+    if (!isActive || !user?._id) return;
 
-  socket.on('new-ride-request', (ride) => {
-    console.log(ride)
-    if (ride.status === "pending") {
-      showNotification(ride);
+    socketRef.current = io("https://my-dipatch-backend.onrender.com", {
+      transports: ["websocket"],
+      withCredentials: true,
+    });
+
+    const socket = socketRef.current;
+
+    socket.on("connect", () => {
+      console.log("✅ Connected:", socket.id);
+      socket.emit("join", { userId: user._id, role: "driver" });
+    });
+
+    socket.on("new-ride-request", (ride) => {
+      console.log("🚕 New ride:", ride);
+      if (ride.status === "pending") {
+        setQueue((prev) => [...prev, ride]); // push to queue
+      }
+    });
+
+    socket.on("connect_error", (err) => {
+      console.error("❌ Socket error:", err.message);
+    });
+
+    return () => {
+      socket.disconnect();
+      socketRef.current = null;
+    };
+  }, [isActive, user?._id]);
+
+  // Show next ride when queue updates
+  useEffect(() => {
+    if (queue.length > 0 && !isVisible) {
+      showNotification(queue[0]); // show first in queue
     }
-  });
-
-  socket.on("connect_error", (err) => {
-    console.error("Socket connection error:", err);
-  });
-
-  return () => {
-    socket.disconnect();
-  };
-}, []);
-
+  }, [queue, isVisible]);
 
   function showNotification(ride) {
-    setNotification({ ...ride, timestamp: Date.now() });
     setIsVisible(true);
     setProgress(100);
 
-    // Progress bar animation
+    // Progress countdown
     clearInterval(progressRef.current);
     const startTime = Date.now();
     progressRef.current = setInterval(() => {
@@ -55,103 +68,98 @@ useEffect(() => {
       setProgress(percent);
     }, 50);
 
-    // Auto-hide after 10 seconds
+    // Auto-dismiss after duration
     clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
-      setIsVisible(false);
-      clearInterval(progressRef.current);
-    }, DURATION);
-
-    // Retry check
-    clearTimeout(retryTimerRef.current);
-    retryTimerRef.current = setTimeout(() => {
-      checkRideStatusAndRetry(ride._id);
+      handleDismiss();
     }, DURATION);
   }
 
-  async function checkRideStatusAndRetry(rideId) {
-    try {
-      const res = await fetch(`https://my-dipatch-backend.onrender.com/api/rides/${rideId}`);
-      console.log(res);
-      const ride = await res.json();
-      console.log(ride);
-      if (ride.status === "pending") {
-        showNotification(ride);
-      }
-    } catch (err) {
-      console.error("Error checking ride status", err);
-    }
+  function handleNextRide() {
+    // Remove the first ride and show next
+    setQueue((prev) => prev.slice(1));
+    setIsVisible(false);
+    clearTimeout(timerRef.current);
+    clearInterval(progressRef.current);
   }
 
-  const handleAccept = () => {
-    console.log('Accepting ride:', notification._id);
+  function handleAccept() {
+    console.log("✅ Ride accepted:", queue[0]?._id);
+    // Clear queue once a ride is accepted
+    setQueue([]);
     setIsVisible(false);
     clearTimeout(timerRef.current);
-    clearTimeout(retryTimerRef.current);
     clearInterval(progressRef.current);
-  };
+  }
 
-  const handleDismiss = () => {
-    setIsVisible(false);
-    clearTimeout(timerRef.current);
-    clearTimeout(retryTimerRef.current);
-    clearInterval(progressRef.current);
-  };
+  function handleDismiss() {
+    console.log("❌ Ride dismissed:", queue[0]?._id);
+    handleNextRide();
+  }
 
-  if (!notification || !isVisible) return null;
+  if (queue.length === 0 || !isVisible) return null;
+
+  const ride = queue[0];
 
   return (
     <div className="fixed bottom-20 md:bottom-8 right-8 z-50 w-96 bg-[#0E2418] text-white rounded-2xl shadow-2xl border-2 border-green-700 overflow-hidden">
-      
       {/* Timer Bar */}
-      <div className="h-1 bg-green-500 transition-all duration-100 ease-linear" style={{ width: `${progress}%` }}></div>
+      <div
+        className="h-1 bg-green-500 transition-all duration-100 ease-linear"
+        style={{ width: `${progress}%` }}
+      ></div>
 
       <div className="p-5 space-y-4">
         {/* Delivery label */}
         <div className="flex justify-center">
-          <span className="bg-green-800 px-3 py-1 rounded-full text-sm font-semibold">Delivery</span>
+          <span className="bg-green-800 px-3 py-1 rounded-full text-sm font-semibold">
+            Delivery
+          </span>
         </div>
 
         {/* Price */}
         <div className="text-center">
-          <p className="text-4xl font-bold">${notification.price}</p>
+          <p className="text-4xl font-bold">${ride.price}</p>
           <p className="text-sm text-gray-300">includes expected tip</p>
         </div>
 
         {/* Time & Distance */}
         <div className="flex items-center justify-center space-x-2 text-gray-200">
           <Clock size={18} />
-          <span>{notification.eta || "15 min"} ({notification.distance || "1.3 mi"}) total</span>
+          <span>
+            {ride.eta || "15 min"} ({ride.distance || "1.3 mi"}) total
+          </span>
         </div>
 
         {/* Pickup & Dropoff & Midway Stops */}
-<div className="space-y-2">
-  {/* Pickup */}
-  <div className="flex items-start space-x-2">
-    <MapPin size={18} className="text-green-500" />
-    <span>{notification.pickup?.address}</span>
-  </div>
+        <div className="space-y-2">
+          {/* Pickup */}
+          <div className="flex items-start space-x-2">
+            <MapPin size={18} className="text-green-500" />
+            <span>{ride.pickup?.address}</span>
+          </div>
 
-  {/* Midway Stops */}
-  {notification.midwayStops?.length > 0 && (
-    <div className="pl-6 space-y-1">
-      <h5 className="text-sm font-semibold text-yellow-400">Midway:{notification.midwayStops.length > 1 ? "s" : ""}</h5>
-      {notification.midwayStops.map((stop, index) => (
-        <div key={index} className="flex items-start space-x-2">
-          <MapPin size={18} className="text-yellow-500" />
-          <span>{stop.address}</span>
+          {/* Midway Stops */}
+          {ride.midwayStops?.length > 0 && (
+            <div className="pl-6 space-y-1">
+              <h5 className="text-sm font-semibold text-yellow-400">
+                Midway{ride.midwayStops.length > 1 ? "s" : ""}
+              </h5>
+              {ride.midwayStops.map((stop, index) => (
+                <div key={index} className="flex items-start space-x-2">
+                  <MapPin size={18} className="text-yellow-500" />
+                  <span>{stop.address}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Dropoff */}
+          <div className="flex items-start space-x-2">
+            <MapPin size={18} className="text-red-500" />
+            <span>{ride.dropoff?.address}</span>
+          </div>
         </div>
-      ))}
-    </div>
-  )}
-
-  {/* Dropoff */}
-  <div className="flex items-start space-x-2">
-    <MapPin size={18} className="text-red-500" />
-    <span>{notification.dropoff?.address}</span>
-  </div>
-</div>
-
 
         {/* Buttons */}
         <div className="flex space-x-2">
