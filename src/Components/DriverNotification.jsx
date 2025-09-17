@@ -5,17 +5,18 @@ import useAuth from "./useAuth";
 
 export default function DriverNotification({ isActive }) {
   const { user } = useAuth();
-  const [queue, setQueue] = useState([]); // queue of rides
+  const [queue, setQueue] = useState([]);
   const [isVisible, setIsVisible] = useState(false);
   const [progress, setProgress] = useState(100);
 
   const timerRef = useRef(null);
   const progressRef = useRef(null);
   const socketRef = useRef(null);
+  const audioRef = useRef(null);
 
   const DURATION = 20 * 1000; // 20 seconds
 
-  // Connect socket
+  // Connect to socket
   useEffect(() => {
     if (!isActive || !user?._id) return;
 
@@ -33,9 +34,7 @@ export default function DriverNotification({ isActive }) {
 
     socket.on("new-ride-request", (ride) => {
       console.log("🚕 New ride:", ride);
-      if (ride.status === "pending") {
-        setQueue((prev) => [...prev, ride]); // push to queue
-      }
+      if (ride.status === "pending") setQueue(prev => [...prev, ride]);
     });
 
     socket.on("connect_error", (err) => {
@@ -51,16 +50,34 @@ export default function DriverNotification({ isActive }) {
   // Show next ride when queue updates
   useEffect(() => {
     if (queue.length > 0 && !isVisible) {
-      showNotification(queue[0]); // show first in queue
+      showNotification(queue[0]);
     }
   }, [queue, isVisible]);
 
+  // Play notification sound
+  function playSound() {
+    if (!audioRef.current) {
+      audioRef.current = new Audio("/notification.mp3");
+      audioRef.current.loop = true;
+    }
+    audioRef.current.play().catch(err => console.warn("🔇 Audio play failed:", err));
+  }
+
+  function stopSound() {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+  }
+
+  // Show notification for ride
   function showNotification(ride) {
     setIsVisible(true);
     setProgress(100);
+    playSound();
 
     // Progress countdown
-    clearInterval(progressRef.current);
+    if (progressRef.current) clearInterval(progressRef.current);
     const startTime = Date.now();
     progressRef.current = setInterval(() => {
       const elapsed = Date.now() - startTime;
@@ -68,28 +85,32 @@ export default function DriverNotification({ isActive }) {
       setProgress(percent);
     }, 50);
 
-    // Auto-dismiss after duration
-    clearTimeout(timerRef.current);
+    // Auto-dismiss
+    if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
       handleDismiss();
     }, DURATION);
   }
 
   function handleNextRide() {
-    // Remove the first ride and show next
-    setQueue((prev) => prev.slice(1));
+    setQueue(prev => prev.slice(1));
     setIsVisible(false);
-    clearTimeout(timerRef.current);
-    clearInterval(progressRef.current);
+    stopSound();
+    if (timerRef.current) clearTimeout(timerRef.current);
+    if (progressRef.current) clearInterval(progressRef.current);
+    timerRef.current = null;
+    progressRef.current = null;
   }
 
   function handleAccept() {
     console.log("✅ Ride accepted:", queue[0]?._id);
-    // Clear queue once a ride is accepted
     setQueue([]);
     setIsVisible(false);
-    clearTimeout(timerRef.current);
-    clearInterval(progressRef.current);
+    stopSound();
+    if (timerRef.current) clearTimeout(timerRef.current);
+    if (progressRef.current) clearInterval(progressRef.current);
+    timerRef.current = null;
+    progressRef.current = null;
   }
 
   function handleDismiss() {
@@ -133,35 +154,28 @@ export default function DriverNotification({ isActive }) {
 
         {/* Pickup & Dropoff & Midway Stops */}
         <div className="space-y-2">
-          {/* Pickup */}
           <div className="flex items-start space-x-2">
             <MapPin size={18} className="text-green-500" />
             <span>{ride.pickup?.address}</span>
           </div>
 
-          {/* Midway Stops */}
-          {ride.midwayStops?.length > 0 && (
-            <div className="pl-6 space-y-1">
-              <h5 className="text-sm font-semibold text-yellow-400">
-                Midway{ride.midwayStops.length > 1 ? "s" : ""}
-              </h5>
-              {ride.midwayStops.map((stop, index) => (
-                <div key={index} className="flex items-start space-x-2">
-                  <MapPin size={18} className="text-yellow-500" />
-                  <span>{stop.address}</span>
-                </div>
-              ))}
-            </div>
-          )}
+          {ride.midwayStops?.length > 0 &&
+  ride.midwayStops.map((stop, index) => {
+    return (
+      <div key={index} className="flex items-start space-x-2">
+        <MapPin size={18} className="text-yellow-500" />
+        <span>{stop.address}</span>
+      </div>
+    );
+  })}
 
-          {/* Dropoff */}
+
           <div className="flex items-start space-x-2">
             <MapPin size={18} className="text-red-500" />
             <span>{ride.dropoff?.address}</span>
           </div>
         </div>
 
-        {/* Buttons */}
         <div className="flex space-x-2">
           <button
             onClick={handleAccept}
