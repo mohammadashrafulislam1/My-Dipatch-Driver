@@ -4,6 +4,7 @@ import io from "socket.io-client";
 import useAuth from "./useAuth";
 import { endPoint } from "./ForAPIs";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
 
 export default function DriverNotification({ isActive }) {
   const { user } = useAuth();
@@ -11,6 +12,7 @@ export default function DriverNotification({ isActive }) {
   const [isVisible, setIsVisible] = useState(false);
   const [progress, setProgress] = useState(100);
   const [activeRide, setActiveRide] = useState(null);
+  const navigate = useNavigate();
 
   const timerRef = useRef(null);
   const progressRef = useRef(null);
@@ -137,9 +139,11 @@ export default function DriverNotification({ isActive }) {
       timerRef.current = null;
       progressRef.current = null;
   
+      // Navigate to live map with ride data
+      navigate(`/ride/${ride._id}`, { state: res.data });
       // Show map screen after accepting
       setActiveRide(res.data);
-  
+   
     } catch (err) {
       console.error("❌ Failed to accept ride:", err);
     }

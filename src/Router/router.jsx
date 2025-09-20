@@ -13,6 +13,7 @@ import Profile from "../pages/Driver/Profile/Profile";
 import Settings from "../pages/Driver/Profile/Setting";
 import Notification from "../pages/Driver/Profile/Notification";
 import Support from "../pages/Driver/Dashboard/Support";
+import RideMap from "../pages/RideMap";
 
 export const router = createBrowserRouter([
     {
@@ -65,6 +66,11 @@ export const router = createBrowserRouter([
     {
         path:'/',
         element:<Driver/>,
+        errorElement:<h1>err</h1>
+    },
+    {
+        path:'/ride/:id',
+        element:<RideMap/>,
         errorElement:<h1>err</h1>
     },
     {
