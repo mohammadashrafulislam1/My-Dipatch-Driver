@@ -14,12 +14,14 @@ import Settings from "../pages/Driver/Profile/Setting";
 import Notification from "../pages/Driver/Profile/Notification";
 import Support from "../pages/Driver/Dashboard/Support";
 import RideMap from "../pages/RideMap";
+import PrivateRoute from "./PrivateRouter";
+import ErrorPage from "../Components/ErrorPage";
 
 export const router = createBrowserRouter([
     {
         path:'/dashboard',
         element:<Dashboard/>,
-        errorElement:<h1>err</h1>,
+        errorElement:<ErrorPage/>,
         children:[
             {
                 path:'',
@@ -66,21 +68,21 @@ export const router = createBrowserRouter([
     {
         path:'/',
         element:<Driver/>,
-        errorElement:<h1>err</h1>
+        errorElement:<ErrorPage/>
     },
     {
         path:'/ride/:id',
-        element:<RideMap/>,
-        errorElement:<h1>err</h1>
+        element:<PrivateRoute><RideMap/></PrivateRoute>,
+        errorElement:<ErrorPage/>
     },
     {
         path:'/login',
         element:<Login/>,
-        errorElement:<h1>err</h1>
+        errorElement:<ErrorPage/>
     },
     {
         path:'/signup',
         element:<Signup/>,
-        errorElement:<h1>err</h1>
+        errorElement:<ErrorPage/>
     },
 ])
