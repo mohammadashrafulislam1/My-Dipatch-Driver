@@ -2,12 +2,15 @@ import { Clock, MapPin } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import io from "socket.io-client";
 import useAuth from "./useAuth";
+import { endPoint } from "./ForAPIs";
+import axios from "axios";
 
 export default function DriverNotification({ isActive }) {
   const { user } = useAuth();
   const [queue, setQueue] = useState([]);
   const [isVisible, setIsVisible] = useState(false);
   const [progress, setProgress] = useState(100);
+  const [activeRide, setActiveRide] = useState(null);
 
   const timerRef = useRef(null);
   const progressRef = useRef(null);
@@ -34,8 +37,19 @@ export default function DriverNotification({ isActive }) {
 
     socket.on("new-ride-request", (ride) => {
       console.log("🚕 New ride:", ride);
-      if (ride.status === "pending") setQueue(prev => [...prev, ride]);
+    
+      if (ride.status === "pending") {
+        // Only add if not already in queue
+        setQueue(prev => {
+          const exists = prev.some(r => r._id === ride._id);
+          return exists ? prev : [...prev, ride];
+        });
+      } else {
+        // If the ride is no longer pending, remove it from the queue
+        setQueue(prev => prev.filter(r => r._id !== ride._id));
+      }
     });
+    
 
     socket.on("connect_error", (err) => {
       console.error("❌ Socket error:", err.message);
@@ -102,15 +116,33 @@ export default function DriverNotification({ isActive }) {
     progressRef.current = null;
   }
 
-  function handleAccept() {
-    console.log("✅ Ride accepted:", queue[0]?._id);
-    setQueue([]);
-    setIsVisible(false);
-    stopSound();
-    if (timerRef.current) clearTimeout(timerRef.current);
-    if (progressRef.current) clearInterval(progressRef.current);
-    timerRef.current = null;
-    progressRef.current = null;
+  async function handleAccept() {
+    const ride = queue[0];
+    if (!ride?._id) return;
+  
+    try {
+      const res = await axios.put(
+        `${endPoint}/rides/status/${ride._id}`,
+        { status: "accepted" }
+      );
+  
+      console.log("✅ Ride accepted:", res.data);
+  
+      // Clear queue & stop notification
+      setQueue([]);
+      setIsVisible(false);
+      stopSound();
+      if (timerRef.current) clearTimeout(timerRef.current);
+      if (progressRef.current) clearInterval(progressRef.current);
+      timerRef.current = null;
+      progressRef.current = null;
+  
+      // Show map screen after accepting
+      setActiveRide(res.data);
+  
+    } catch (err) {
+      console.error("❌ Failed to accept ride:", err);
+    }
   }
 
   function handleDismiss() {
@@ -123,7 +155,7 @@ export default function DriverNotification({ isActive }) {
   const ride = queue[0];
 
   return (
-    <div className="fixed bottom-20 md:bottom-8 right-8 z-50 w-96 bg-[#0E2418] text-white rounded-2xl shadow-2xl border-2 border-green-700 overflow-hidden">
+    <div className="fixed bottom-20 md:bottom-8 md:right-8 z-50 md:w-96 md:mx-0 mx-4 bg-[#0E2418] text-white rounded-2xl shadow-2xl border-2 border-green-700 overflow-hidden">
       {/* Timer Bar */}
       <div
         className="h-1 bg-green-500 transition-all duration-100 ease-linear"
