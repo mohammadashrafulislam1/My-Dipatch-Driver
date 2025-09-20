@@ -250,7 +250,7 @@ useEffect(() => {
 ) : (
   /* Guest / Not Logged In */
   <div
-    className="absolute left-1/2 transform -translate-x-1/2 top-32
+    className="absolute left-1/2 transform -translate-x-1/2 md:top-32 top-56
       max-w-lg md:w-[90vw] w-[90%] 
       bg-white/40 backdrop-blur-md border border-white/30
       rounded-3xl md:p-10 p-5 shadow-2xl text-center z-20"
@@ -411,7 +411,8 @@ useEffect(() => {
         </MapContainer>
 
         {/* Car Icon */}
-        <div className="absolute left-12 bottom-12 z-[1000] bg-blue-600 p-4 rounded-full text-white text-3xl shadow-xl animate-bounce">
+        <div className="absolute left-12 md:bottom-12 bottom-16 z-[1000] bg-blue-600 p-4 rounded-full 
+        text-white text-3xl shadow-xl animate-bounce">
           <FaCar />
         </div>
 
