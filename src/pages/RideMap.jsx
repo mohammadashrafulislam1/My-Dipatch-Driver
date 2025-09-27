@@ -65,15 +65,41 @@ export default function RideMap() {
     mapInstance.current.addControl(new mapboxgl.NavigationControl(), "top-right");
 
     mapInstance.current.on("load", () => {
-      // Load custom arrow image
-  mapInstance.current.loadImage("https://i.ibb.co/Psm5vrxs/Gemini-Generated-Image-aaev1maaev1maaev-removebg-preview.png", (error, image) => {
-    if (error) throw error;
-    if (!mapInstance.current.hasImage("arrow-icon")) {
-      mapInstance.current.addImage("arrow-icon", image);
-    }
-  });
+      // --- Load driver arrow ---
+      mapInstance.current.loadImage(
+        "https://i.ibb.co/Psm5vrxs/Gemini-Generated-Image-aaev1maaev1maaev-removebg-preview.png",
+        (error, image) => {
+          if (error) throw error;
+          if (!mapInstance.current.hasImage("arrow-icon")) {
+            mapInstance.current.addImage("arrow-icon", image);
+          }
+        }
+      );
 
-  fetchDirections();
+      // --- Load midway stop icon ---
+      mapInstance.current.loadImage(
+        "https://i.ibb.co/N6c33bGK/349750.png",
+        (error, image) => {
+          if (error) throw error;
+          if (!mapInstance.current.hasImage("midway-icon")) {
+            mapInstance.current.addImage("midway-icon", image);
+          }
+        }
+      );
+
+      // --- Load drop-off icon ---
+      mapInstance.current.loadImage(
+        "https://i.ibb.co/MxJckn1b/location-icon-png-4240.png",
+        (error, image) => {
+          if (error) throw error;
+          if (!mapInstance.current.hasImage("dropoff-icon")) {
+            mapInstance.current.addImage("dropoff-icon", image);
+          }
+        }
+      );
+
+      // Fetch route after icons are loaded
+      fetchDirections();
     });
 
     return () => {
@@ -106,6 +132,7 @@ export default function RideMap() {
         const route = res.body.routes[0];
         const path = route.geometry.coordinates;
 
+        // --- Route line ---
         if (mapInstance.current.getSource("route")) {
           mapInstance.current.getSource("route").setData(route.geometry);
         } else {
@@ -119,7 +146,7 @@ export default function RideMap() {
           });
         }
 
-        // --- DRIVER MARKER PART (from first code) ---
+        // --- Driver marker ---
         if (!mapInstance.current.getSource("driver")) {
           mapInstance.current.addSource("driver", {
             type: "geojson",
@@ -140,7 +167,7 @@ export default function RideMap() {
             type: "symbol",
             source: "driver",
             layout: {
-              "icon-image": "arrow-icon", // Mapbox default car icon
+              "icon-image": "arrow-icon",
               "icon-size": 0.2,
               "icon-rotate": ["get", "bearing"],
               "icon-rotation-alignment": "map",
@@ -148,8 +175,62 @@ export default function RideMap() {
             },
           });
         }
-        // ------------------------------------------
 
+        // --- Midway stops ---
+        if (ride.midwayStops?.length && !mapInstance.current.getSource("midway-stops")) {
+          mapInstance.current.addSource("midway-stops", {
+            type: "geojson",
+            data: {
+              type: "FeatureCollection",
+              features: ride.midwayStops.map((stop) => ({
+                type: "Feature",
+                geometry: { type: "Point", coordinates: [stop.lng, stop.lat] },
+                properties: {},
+              })),
+            },
+          });
+
+          mapInstance.current.addLayer({
+            id: "midway-layer",
+            type: "symbol",
+            source: "midway-stops",
+            layout: {
+              "icon-image": "midway-icon",
+              "icon-size": 0.02,
+              "icon-allow-overlap": true,
+            },
+          });
+        }
+
+        // --- Drop-off ---
+        if (!mapInstance.current.getSource("dropoff")) {
+          mapInstance.current.addSource("dropoff", {
+            type: "geojson",
+            data: {
+              type: "FeatureCollection",
+              features: [
+                {
+                  type: "Feature",
+                  geometry: { type: "Point", coordinates: [ride.dropoff.lng, ride.dropoff.lat] },
+                  properties: {},
+                },
+              ],
+            },
+          });
+
+          mapInstance.current.addLayer({
+            id: "dropoff-layer",
+            type: "symbol",
+            source: "dropoff",
+            layout: {
+              "icon-image": "dropoff-icon",
+              "icon-size": 0.2,
+              "icon-allow-overlap": true,
+            },
+          });
+        }
+
+        // --- Instructions and segments ---
         const stepsData = [];
         const segments = [];
         let idx = 0;
@@ -185,68 +266,55 @@ export default function RideMap() {
       });
   }, [ride]);
 
-// Start navigation
-const handleStartJourney = () => {
-  if (!routePath.length || journeyStarted) return;
-  setJourneyStarted(true);
+  // Start navigation
+  const handleStartJourney = () => {
+    if (!routePath.length || journeyStarted) return;
+    setJourneyStarted(true);
 
-  const line = turf.lineString(routePath);
-  const routeLength = turf.length(line, { units: "kilometers" });
+    const line = turf.lineString(routePath);
+    const routeLength = turf.length(line, { units: "kilometers" });
 
-  let traveled = 0; // km
-  const speed = 0.02; // km per frame (≈ 180 km/h, adjust down for slower driving)
+    let traveled = 0; // km
+    const speed = 0.02; // km per frame (≈ 180 km/h, adjust as needed)
 
-  const animate = () => {
-    if (traveled >= routeLength) {
-      setCurrentStep(instructions.length);
-      setJourneyStarted(false);
-      return;
-    }
+    const animate = () => {
+      if (traveled >= routeLength) {
+        setCurrentStep(instructions.length);
+        setJourneyStarted(false);
+        return;
+      }
 
-    // Get current point along route
-    const currentPoint = turf.along(line, traveled, { units: "kilometers" });
-    const nextPoint = turf.along(line, traveled + 0.01, { units: "kilometers" });
+      const currentPoint = turf.along(line, traveled, { units: "kilometers" });
+      const nextPoint = turf.along(line, traveled + 0.01, { units: "kilometers" });
 
-    const coords = currentPoint.geometry.coordinates;
-    const heading = turf.bearing(
-      turf.point(coords),
-      turf.point(nextPoint.geometry.coordinates)
-    );
+      const coords = currentPoint.geometry.coordinates;
+      const heading = turf.bearing(turf.point(coords), turf.point(nextPoint.geometry.coordinates));
 
-    // Update driver icon position
-    const driverSource = mapInstance.current.getSource("driver");
-    if (driverSource) {
-      driverSource.setData({
-        type: "FeatureCollection",
-        features: [
-          {
-            type: "Feature",
-            geometry: { type: "Point", coordinates: coords },
-            properties: { bearing: heading },
-          },
-        ],
+      const driverSource = mapInstance.current.getSource("driver");
+      if (driverSource) {
+        driverSource.setData({
+          type: "FeatureCollection",
+          features: [
+            { type: "Feature", geometry: { type: "Point", coordinates: coords }, properties: { bearing: heading } },
+          ],
+        });
+      }
+
+      mapInstance.current.easeTo({
+        center: coords,
+        zoom: 17,
+        pitch: 65,
+        bearing: heading,
+        duration: 100,
+        easing: (t) => t,
       });
-    }
 
-    // Move camera smoothly with driver
-    mapInstance.current.easeTo({
-      center: coords,
-      zoom: 17,
-      pitch: 65,
-      bearing: heading,
-      duration: 100,
-      easing: (t) => t, // linear easing
-    });
+      traveled += speed;
+      requestAnimationFrame(animate);
+    };
 
-    // Progress forward
-    traveled += speed;
-
-    requestAnimationFrame(animate);
+    animate();
   };
-
-  animate();
-};
-
 
   useEffect(() => () => clearInterval(intervalRef.current), []);
 
@@ -260,26 +328,16 @@ const handleStartJourney = () => {
 
       {/* TOP NAVIGATION HEADER */}
       {journeyStarted && currentInstruction && (
-        <div
-          className={`absolute top-0 left-0 right-0 p-4 shadow-2xl z-10 ${
-            isDarkMode ? "bg-gray-900 text-white" : "bg-blue-600 text-white"
-          }`}
-        >
+        <div className={`absolute top-0 left-0 right-0 p-4 shadow-2xl z-10 ${isDarkMode ? "bg-gray-900 text-white" : "bg-blue-600 text-white"}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               <span className="text-5xl mr-3 font-bold">↩️</span>
               <div>
-                <p className="text-4xl font-extrabold">
-                  {(remaining.distance / 1609.34).toFixed(1)} mi
-                </p>
+                <p className="text-4xl font-extrabold">{(remaining.distance / 1609.34).toFixed(1)} mi</p>
                 <p className="text-xl">{currentInstruction.instruction}</p>
               </div>
             </div>
-            <div
-              className={`text-center p-2 rounded ${
-                isDarkMode ? "bg-gray-700" : "bg-white text-black"
-              }`}
-            >
+            <div className={`text-center p-2 rounded ${isDarkMode ? "bg-gray-700" : "bg-white text-black"}`}>
               <p className="text-sm">45</p>
               <p className="text-xs">MPH</p>
             </div>
@@ -288,16 +346,12 @@ const handleStartJourney = () => {
       )}
 
       {/* BOTTOM CARD */}
-      <div
-        className={`absolute bottom-0 w-full p-3 shadow-2xl z-10 ${
-          isDarkMode ? "bg-gray-800 text-white" : "bg-white text-gray-900"
-        }`}
-      >
+      <div className={`absolute bottom-0 w-full p-3 shadow-2xl z-10 ${isDarkMode ? "bg-gray-800 text-white" : "bg-white text-gray-900"}`}>
         <div className="flex justify-between items-center text-sm">
           <div className="font-medium">
             <p>{new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>
             <p className="opacity-70">
-              {(remaining.distance / 1609.34).toFixed(1)} mi • {`${(remaining.duration / 60).toFixed(0)} min`}
+              {(remaining.distance / 1609.34).toFixed(1)} mi • {(remaining.duration / 60).toFixed(0)} min
             </p>
           </div>
 
@@ -326,9 +380,7 @@ const handleStartJourney = () => {
       {/* Dark/Light Mode */}
       <button
         onClick={() => setIsDarkMode(!isDarkMode)}
-        className={`absolute top-4 right-4 p-2 rounded-full shadow-lg z-20 ${
-          isDarkMode ? "bg-white text-gray-900" : "bg-gray-900 text-white"
-        }`}
+        className={`absolute top-4 right-4 p-2 rounded-full shadow-lg z-20 ${isDarkMode ? "bg-white text-gray-900" : "bg-gray-900 text-white"}`}
       >
         {isDarkMode ? "☀️" : "🌙"}
       </button>
