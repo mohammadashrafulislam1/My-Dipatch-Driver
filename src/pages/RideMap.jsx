@@ -3,7 +3,9 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import mapboxgl from "mapbox-gl";
 import mbxDirections from "@mapbox/mapbox-sdk/services/directions";
 import * as turf from "@turf/turf";
-
+import { FaArrowUp } from "react-icons/fa";
+// Import necessary React Icons
+import {  FaArrowRight, FaReply, FaChevronCircleUp } from "react-icons/fa";
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 const directionsClient = mbxDirections({ accessToken: mapboxgl.accessToken });
 
@@ -11,6 +13,19 @@ const directionsClient = mbxDirections({ accessToken: mapboxgl.accessToken });
 const fetchCustomerData = async (customerId) => {
   await new Promise((r) => setTimeout(r, 300));
   return { id: customerId, name: "Rider Name", rating: 4.8, contact: "123-456-7890" };
+};
+
+// Map maneuver modifier strings to React Icons
+const maneuverIcons = {
+  "uturn": <FaReply className="transform rotate-90" />,
+  "sharp right": <FaArrowRight className="transform -rotate-45" />,
+  "right": <FaArrowRight />,
+  "slight right": <FaArrowRight className="transform rotate-45" />,
+  "straight": <FaArrowUp />,
+  "slight left": <FaArrowRight className="transform rotate-[135deg]" />,
+  "left": <FaArrowRight className="transform rotate-180" />,
+  "sharp left": <FaArrowRight className="transform rotate-[225deg]" />,
+  "default": <FaArrowUp />, // Fallback icon
 };
 
 export default function RideMap() {
@@ -447,56 +462,75 @@ useEffect(() => {
       <div ref={mapRef} className="w-full h-full" />
 
       {/* TOP NAVIGATION HEADER (MATCHING DESIGN) */}
-      {journeyStarted && currentInstruction && (
-        <div className="absolute top-0 left-0 right-0 p-3 z-10">
-          {/* Blue Instruction Box */}
-          <div className={`px-4 py-2 rounded-xl shadow-2xl w-full max-w-sm ${isDarkMode ? "bg-blue-800 text-white" : "bg-blue-600 text-white"}`}>
-            <div className="flex items-center space-x-2">
-              {/* Turn Icon */}
-              <span className="text-3xl font-bold">↩️</span>
-              <div>
-                {/* Distance */}
-                <p className="text-2xl font-extrabold leading-none">
-                  {(remaining.distance / 1609.34).toFixed(1)} mi
-                </p>
-                {/* Street Name/Instruction */}
-                <p className="text-sm font-semibold">{currentInstruction.instruction}</p>
-              </div>
-            </div>
-          </div>
+     {journeyStarted && currentInstruction && (
+  <div className="absolute top-0 left-0 right-0 p-3 z-10 flex justify-between items-start">
+    {/* Left: Instruction Box */}
+    <div
+      className={`px-10 py-6 rounded-xl shadow-2xl max-w-sm ${
+        isDarkMode ? "bg-blue-600 text-white" : "bg-blue-600 text-white"
+      }`}
+    >
+      <div className="flex items-center gap-8">
+        {/* Turn Icon */}
+        <span className="text-5xl font-medium">
+          {maneuverIcons[currentInstruction.maneuver?.modifier] || maneuverIcons["default"]}
+        </span>
+
+        <div>
+          {/* Distance until turn */}
+          <p className="text-4xl font-semibold mb-2 leading-none">
+            {(currentInstruction.distance / 1609.34).toFixed(1)} mi
+          </p>
+          {/* Instruction text */}
+          <p className="text-sm font-normal">
+            {currentInstruction.instruction}
+          </p>
         </div>
-      )}
+      </div>
+    </div>
+
+    {/* Right: Speed Limit Box (Matching Image Design) */}
+    <div className={`text-center p-2 rounded-md shadow-lg border-4 border-white ${isDarkMode ? "bg-white text-black" : "bg-white text-black"}`}>
+        <p className="text-2xl font-extrabold leading-none">45</p>
+        <p className="text-xs">MPH</p>
+    </div>
+  </div>
+)}
+
 
       {/* RIGHT SIDE SETTINGS/WIDGETS */}
       <div className="absolute top-4 right-4 flex flex-col items-end space-y-2 z-20">
         {/* Settings Icon (Top Right) */}
-        <button className={`p-2 rounded-full shadow-lg ${isDarkMode ? "bg-gray-700 text-white" : "bg-white text-gray-900"}`}>
+        <button className={`p-3 text-2xl rounded-xl shadow-lg ${isDarkMode ? "bg-gray-700 text-white" : "bg-white text-gray-900"}`}>
           ⚙️
         </button>
         {/* Dark/Light Mode Switch */}
         <button
           onClick={() => setIsDarkMode(!isDarkMode)}
-          className={`p-2 rounded-full shadow-lg ${isDarkMode ? "bg-gray-700 text-white" : "bg-white text-gray-900"}`}
+          className={`p-3 text-2xl rounded-xl shadow-lg ${isDarkMode ? "bg-gray-700 text-white" : "bg-white text-gray-900"}`}
         >
           {isDarkMode ? "☀️" : "🌙"}
         </button>
       </div>
 
       {/* BOTTOM NAVIGATION BAR (MATCHING DESIGN) */}
-      <div className={`absolute bottom-0 w-full px-3 pt-3 pb-4 shadow-2xl z-10 ${isDarkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-900"}`}>
+      <div className={`absolute flex gap-24 flex-row-reverse bottom-0 w-full shadow-2xl z-10 px-10`}>
         
         {/* START JOURNEY BUTTON (When stopped) */}
         {!journeyStarted && routePath.length > 0 && (
           <button
             onClick={handleStartJourney}
-            className="w-full mb-3 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg hover:bg-green-700 font-bold"
+            className="text-center flex items-center justify-center
+ mb-4 bg-gray-900 text-white w-28 h-24 rounded-full shadow-lg hover:bg-black font-bold"
           >
-            🚀 Start Navigation
+            <img src="https://i.ibb.co/Psm5vrxs/Gemini-Generated-Image-aaev1maaev1maaev-removebg-preview.png" alt="" 
+   className=" w-28"/>
           </button>
         )}
 
         {/* NAVIGATION INFO BAR (When running or initial state) */}
-        <div className="flex items-center justify-between h-12">
+        <div className={`flex items-center w-full p-5 rounded-xl justify-between h-full 
+  ${isDarkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-900"}`}>
             {/* Left Section: Menu Button */}
             <button className={`p-2 rounded-full text-2xl ${isDarkMode ? "text-white" : "text-gray-900"}`}>
                 &#x22EE; {/* Three vertical dots (More menu) */}
@@ -520,8 +554,12 @@ useEffect(() => {
                         <p className="font-bold text-lg">
                             {new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                         </p>
-                        <p className="opacity-70 text-xs">
-                             {(remaining.distance / 1609.34).toFixed(1)} mi • {(remaining.duration / 60).toFixed(0)} min
+                        <p className="opacity-70 text-xs">{ride.distance
+  ? `${ride.distance} • ${ride.eta} min`
+  : `${(remaining.distance / 1609.34).toFixed(1)} mi • ${ride.eta} `
+}
+
+
                         </p>
                     </div>
                 )}
