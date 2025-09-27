@@ -46,10 +46,22 @@ export default function RideMap() {
   const [remaining, setRemaining] = useState({ distance: 0, duration: 0 });
   const [stepSegments, setStepSegments] = useState([]);
   const [customer, setCustomer] = useState(null);
-  const [isDarkMode, setIsDarkMode] = useState(new Date().getHours() >= 18 || new Date().getHours() < 6);
+ // Initialize directly from localStorage
+ const [isDarkMode, setIsDarkMode] = useState(() => {
+  const saved = localStorage.getItem("darkMode");
+  return saved ? saved === "true" : false; // default = false if nothing saved
+});
+
+// Save mode to localStorage whenever it changes
+useEffect(() => {
+  localStorage.setItem("darkMode", isDarkMode);
+}, [isDarkMode]);
+
 
   const [mapLoaded, setMapLoaded] = useState(false);
-
+// NEW REFS for animation state
+const traveledRef = useRef(0);
+const animationRef = useRef(null);
   const intervalRef = useRef(null);
 
   const computeSmoothHeading = useCallback((path, index, lookAhead = 5) => {
@@ -584,13 +596,20 @@ useEffect(() => {
         <button className={`p-3 text-2xl rounded-xl shadow-lg ${isDarkMode ? "bg-gray-700 text-white" : "bg-white text-gray-900"}`}>
           ⚙️
         </button>
-        {/* Dark/Light Mode Switch */}
-        <button
-          onClick={() => setIsDarkMode(!isDarkMode)}
-          className={`p-3 text-2xl rounded-xl shadow-lg ${isDarkMode ? "bg-gray-700 text-white" : "bg-white text-gray-900"}`}
-        >
-          {isDarkMode ? "☀️" : "🌙"}
-        </button>
+       {/* { // Dark mode toggle button} */}
+<button
+  onClick={() => {setIsDarkMode(!isDarkMode);
+    window.location.reload(); // reload if you still want it
+    }
+  }
+  className={`p-3 text-2xl rounded-xl shadow-lg ${
+    isDarkMode ? "bg-gray-700 text-white" : "bg-white text-gray-900"
+  }`}
+>
+  {isDarkMode ? "☀️" : "🌙"}
+</button>
+
+
       </div>
 
       {/* CAMERA CONTROLS - Bottom Right */}
