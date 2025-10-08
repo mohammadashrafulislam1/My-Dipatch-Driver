@@ -1,18 +1,31 @@
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useRef, useState, useCallback } from "react";
 import mapboxgl from "mapbox-gl";
 import mbxDirections from "@mapbox/mapbox-sdk/services/directions";
 import * as turf from "@turf/turf";
 import { FaArrowUp } from "react-icons/fa";
 // Import necessary React Icons
-import {  FaArrowRight, FaReply, FaChevronCircleUp, FaCrosshairs, FaPlus, FaMinus } from "react-icons/fa";
+import { FaArrowRight, FaReply, FaChevronCircleUp, FaCrosshairs, FaPlus, FaMinus, FaComments } from "react-icons/fa";
+import { endPoint } from "../Components/ForAPIs";
+
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 const directionsClient = mbxDirections({ accessToken: mapboxgl.accessToken });
 
-// Mock customer fetch
+// Real customer fetch from backend
 const fetchCustomerData = async (customerId) => {
-  await new Promise((r) => setTimeout(r, 300));
-  return { id: customerId, name: "Rider Name", rating: 4.8, contact: "123-456-7890" };
+  try {
+    
+    const response = await fetch(`${endPoint}/user/${customerId}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch customer data');
+    }
+    const customerData = await response.json();
+    console.log(customerData)
+    return customerData;
+  } catch (error) {
+    console.error('Error fetching customer data:', error);
+    // Fallback to mock data if backend fails
+  }
 };
 
 // Map maneuver modifier strings to React Icons
@@ -32,36 +45,37 @@ const maneuverIcons = {
   "default": <FaArrowUp />, // fallback
 };
 
-
 export default function RideMap() {
   const { state: ride } = useLocation();
+  const navigate = useNavigate();
   const mapRef = useRef(null);
   const mapInstance = useRef(null);
   console.log(ride)
   const [routePath, setRoutePath] = useState([]);
   const [journeyStarted, setJourneyStarted] = useState(false);
+  const journeyActiveRef = useRef(false);
 
   const [instructions, setInstructions] = useState([]);
   const [currentStep, setCurrentStep] = useState(0);
   const [remaining, setRemaining] = useState({ distance: 0, duration: 0 });
   const [stepSegments, setStepSegments] = useState([]);
   const [customer, setCustomer] = useState(null);
- // Initialize directly from localStorage
- const [isDarkMode, setIsDarkMode] = useState(() => {
-  const saved = localStorage.getItem("darkMode");
-  return saved ? saved === "true" : false; // default = false if nothing saved
-});
+  
+  // Initialize directly from localStorage
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    const saved = localStorage.getItem("darkMode");
+    return saved ? saved === "true" : false; // default = false if nothing saved
+  });
 
-// Save mode to localStorage whenever it changes
-useEffect(() => {
-  localStorage.setItem("darkMode", isDarkMode);
-}, [isDarkMode]);
-
+  // Save mode to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem("darkMode", isDarkMode);
+  }, [isDarkMode]);
 
   const [mapLoaded, setMapLoaded] = useState(false);
-// NEW REFS for animation state
-const traveledRef = useRef(0);
-const animationRef = useRef(null);
+  // NEW REFS for animation state
+  const traveledRef = useRef(0);
+  const animationRef = useRef(null);
   const intervalRef = useRef(null);
 
   const computeSmoothHeading = useCallback((path, index, lookAhead = 5) => {
@@ -71,6 +85,13 @@ const animationRef = useRef(null);
     return turf.bearing(turf.point(start), turf.point(end));
   }, []);
 
+// In RideMap.jsx - update the handleChatWithCustomer function
+const handleChatWithCustomer = () => {
+  if (customer && ride) { // Ensure both customer and ride data are available
+    // PASS RIDE ID in the query params
+    navigate(`/dashboard/chat?user=${customer._id}&rideId=${ride._id}&rideStatus=${ride.status}`);
+  }
+};
 
 // ------------------------------------------------------------------
 // Fetch route (Uses symbol layers for labels)
@@ -303,43 +324,53 @@ const animationRef = useRef(null);
   }, [ride, isDarkMode]);
 
 // Start navigation
-// Start navigation
 const handleStartJourney = useCallback(() => {
-  if (!routePath.length || journeyStarted) return;
+  if (!routePath.length || journeyActiveRef.current) return;
+
   setJourneyStarted(true);
+  journeyActiveRef.current = true;   // mark journey active
 
   const line = turf.lineString(routePath);
   const routeLength = turf.length(line, { units: "kilometers" });
 
-  let traveled = 0; // km
-  const speed = 0.02; // km per frame
+  let traveled = 0;
+  const speed = 0.003;
 
   const animate = () => {
     if (traveled >= routeLength) {
       setCurrentStep(instructions.length);
       setRemaining({ distance: 0, duration: 0 });
       setJourneyStarted(false);
+      journeyActiveRef.current = false;
       return;
     }
-
+  
+    // Get current + next point along the route
     const currentPoint = turf.along(line, traveled, { units: "kilometers" });
     const nextPoint = turf.along(line, traveled + 0.01, { units: "kilometers" });
-
+  
     const coords = currentPoint.geometry.coordinates;
-    const heading = turf.bearing(turf.point(coords), turf.point(nextPoint.geometry.coordinates));
-
-    // Update driver position
+    const heading = turf.bearing(
+      turf.point(coords),
+      turf.point(nextPoint.geometry.coordinates)
+    );
+  
+    // Update driver marker
     const driverSource = mapInstance.current.getSource("driver");
     if (driverSource) {
       driverSource.setData({
         type: "FeatureCollection",
         features: [
-          { type: "Feature", geometry: { type: "Point", coordinates: coords }, properties: { bearing: heading } },
+          {
+            type: "Feature",
+            geometry: { type: "Point", coordinates: coords },
+            properties: { bearing: heading },
+          },
         ],
       });
     }
-
-    // Update map view
+  
+    // Update camera
     mapInstance.current.easeTo({
       center: coords,
       zoom: 17,
@@ -348,48 +379,53 @@ const handleStartJourney = useCallback(() => {
       duration: 100,
       easing: (t) => t,
     });
-
-    // Calculate current step and remaining distance
+  
+    // --- Sync step with marker ---
+    const snapped = turf.nearestPointOnLine(line, currentPoint, { units: "kilometers" });
+    const traveledSoFar = snapped.properties.location; // total km along route
+  
     let currentStepIndex = 0;
+    let cumulative = 0;
     let remainingDistance = 0;
-    
-    // Find which step we're currently on
+  
     for (let i = 0; i < stepSegments.length; i++) {
       const segment = stepSegments[i];
-      const segmentLine = turf.lineString(routePath.slice(segment.startIndex, segment.endIndex + 1));
-      const segmentLength = turf.length(segmentLine, { units: "kilometers" });
-      
-      // Calculate distance traveled in this segment
-      const segmentStartDistance = traveled - routePath.slice(0, segment.startIndex).reduce((acc, _, idx) => {
-        if (idx === 0) return 0;
-        const segment = turf.lineString([routePath[idx-1], routePath[idx]]);
-        return acc + turf.length(segment, { units: "kilometers" });
-      }, 0);
-      
-      if (segmentStartDistance >= 0 && segmentStartDistance < segmentLength) {
+      const segmentLine = turf.lineString(
+        routePath.slice(segment.startIndex, segment.endIndex + 1)
+      );
+      const segLength = turf.length(segmentLine, { units: "kilometers" });
+  
+      if (traveledSoFar >= cumulative && traveledSoFar <= cumulative + segLength) {
         currentStepIndex = i;
-        remainingDistance = segmentLength - segmentStartDistance;
+        remainingDistance = cumulative + segLength - traveledSoFar;
         break;
       }
+      cumulative += segLength;
     }
-
-    // Update state with proper functional updates to ensure re-renders
+  
+    // Update UI state
     setCurrentStep(currentStepIndex);
-    setRemaining({ 
-      distance: remainingDistance * 1000, // Convert to meters
-      duration: (remainingDistance / 0.06) * 60 // Estimate duration (assuming 60km/h)
+    setRemaining({
+      distance: remainingDistance * 1000, // meters
+      duration: (remainingDistance / 0.06) * 60, // minutes at 60 km/h
     });
-
+  
+    // Advance along route
     traveled += speed;
-    
-    // Continue animation only if journey is still active
-    if (journeyStarted) {
+  
+    if (journeyActiveRef.current) {
       requestAnimationFrame(animate);
     }
-  };
+  };  
 
   animate();
-}, [routePath, journeyStarted, instructions, stepSegments]);
+}, [routePath, instructions, stepSegments]);
+
+useEffect(() => {
+  return () => {
+    journeyActiveRef.current = false;
+  };
+}, []);
 
 // Camera control functions
 const centerOnDriver = useCallback(() => {
@@ -589,7 +625,6 @@ useEffect(() => {
   </div>
 )}
 
-
       {/* RIGHT SIDE SETTINGS/WIDGETS */}
       <div className="absolute top-4 right-4 flex flex-col items-end space-y-2 z-20">
         {/* Settings Icon (Top Right) */}
@@ -608,7 +643,6 @@ useEffect(() => {
 >
   {isDarkMode ? "☀️" : "🌙"}
 </button>
-
 
       </div>
 
@@ -643,11 +677,13 @@ useEffect(() => {
       </div>
 
       {/* SPEED LIMIT - Bottom Left */}
-      <div className={`absolute bottom-32 left-4 text-center p-3 rounded-xl shadow-lg border-4 
-        ${isDarkMode ? "border-white bg-white text-black" : "border-white bg-white text-black"}`}>
-        <p className="text-2xl font-extrabold leading-none">45</p>
-        <p className="text-xs">km/h</p>
-      </div>
+<div className={`absolute bottom-32 left-4 text-center p-3 rounded-xl shadow-lg border-4 
+  ${isDarkMode ? "border-white bg-white text-black" : "border-white bg-white text-black"}`}>
+  <p className="text-2xl font-extrabold leading-none">
+    {journeyStarted ? Math.round((remaining.distance / 1609.34) * 2.23694) : 0}
+  </p>
+  <p className="text-xs">mph</p>
+</div>
 
       {/* BOTTOM NAVIGATION BAR (MATCHING DESIGN) */}
       <div className={`absolute flex gap-24 flex-row-reverse bottom-0 w-full shadow-2xl z-10 px-10`}>
@@ -698,19 +734,39 @@ useEffect(() => {
                     </div>
                 )}
             </div>
+            
+      {/* CUSTOMER INFO - Top Left */}
+      {customer && (
+        <div className={` top-4 left-4 p-4 rounded-xl shadow-lg z-20 ${
+          isDarkMode ? "bg-gray-800 text-white" : "bg-white text-gray-900"
+        }`}>
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
+  {customer.firstName?.charAt(0)}
+</div>
+<div>
+  <p className="font-semibold">
+    {customer.firstName} {customer.lastName}
+  </p>
+  <p className="text-sm opacity-75">
+    ⭐ {customer.rating || 4.8}
+  </p>
+</div>
 
-            {/* Right Section: Speed Limit/Weather/Options */}
-            <div className="flex items-center space-x-2">
-                {/* Weather Widget (Mockup inspired) */}
-                <div className="flex items-center text-xs opacity-80">
-                    <span className="text-lg">☀️</span>
-                    <p className="ml-1">75°</p>
-                </div>
-                {/* Close Button (X icon) */}
-                <button className={`p-2 rounded-full text-2xl ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-                    &#x2715;
-                </button>
-            </div>
+            <button
+              onClick={handleChatWithCustomer}
+              className={`p-3 rounded-full ${
+                isDarkMode ? "bg-blue-600 hover:bg-blue-700" : "bg-blue-500 hover:bg-blue-600"
+              } text-white ml-2`}
+              title="Chat with customer"
+            >
+              <FaComments />
+            </button>
+          </div>
+        </div>
+      )}
+
+          
         </div>
       </div>
     </div>

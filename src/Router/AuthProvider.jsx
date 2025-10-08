@@ -6,7 +6,7 @@ export const AuthContext = createContext();
 const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(false);
-  console.log(user?.profileImage)
+ 
 
   // ✅ Fetch current user from backend
 const fetchCurrentUser = async () => {
@@ -14,7 +14,6 @@ const fetchCurrentUser = async () => {
       const { data } = await axios.get(`${endPoint}/user/me`, {
         withCredentials: true, // important!
       });
-      console.log(data)
       setUser(data); // set the current user
     } catch (err) {
       setUser(null);
