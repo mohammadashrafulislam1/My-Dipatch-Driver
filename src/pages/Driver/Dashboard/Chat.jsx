@@ -1,11 +1,13 @@
+// Driver/Rider chat
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { IoSend, IoArrowBackOutline } from "react-icons/io5";
-import { BsCircleFill, BsPaperclip } from "react-icons/bs";
+import { BsPaperclip } from "react-icons/bs";
 import { MdImage } from "react-icons/md";
 import useAuth from "../../../Components/useAuth";
 import axios from "axios";
 import { endPoint } from "../../../Components/ForAPIs";
+import io from 'socket.io-client'; // 1. Import socket.io-client
 
 
 const Chat = () => {
@@ -15,7 +17,7 @@ const Chat = () => {
   const [messages, setMessages] = useState({});
   const [selectedFile, setSelectedFile] = useState(null);
   const [rideStatus, setRideStatus] = useState(null);
-  const [activeRide, setActiveRide] = useState(null); // NEW: To store active ride data
+  const [activeRide, setActiveRide] = useState(null); 
 
   const { user } = useAuth(); // Assume user object contains the current user's details (driver/customer)
 
@@ -24,15 +26,111 @@ const Chat = () => {
 
   const fileInputRef = useRef(null);
   const imageInputRef = useRef(null);
+  const messagesEndRef = useRef(null); // Ref for auto-scrolling
+  const socket = useRef(null); // Ref to hold the socket instance
 
   const userIdFromQuery = searchParams.get("user");
   const rideStatusFromQuery = searchParams.get("rideStatus");
-  const rideIdFromQuery = searchParams.get("rideId"); // NEW: Get rideId from query
+  const rideIdFromQuery = searchParams.get("rideId"); 
 
   // Allowed statuses for messaging
   const allowedStatuses = ["accepted", "on_the_way", "in_progress"];
   const canSendMessages = rideStatus && allowedStatuses.includes(rideStatus);
 
+  // Function to handle incoming messages from the socket (for both customer and driver)
+  const handleIncomingMessage = (msg) => {
+    console.log("Received new message via socket:", msg);
+    
+    // Determine the chat partner's ID (the user whose chat window should update)
+    const partnerId = msg.senderId === user._id ? msg.recipientId : msg.senderId;
+
+    // Format the incoming message structure to match existing state format
+    const formattedMessage = {
+        from: msg.senderId === user._id ? "me" : "other", // 'me' if sender is current user (e.g., sent from another device)
+        text: msg.message,
+        file: msg.fileUrl,
+        fileType: msg.fileType, // Assuming backend sends "image" or "file"
+        fileName: msg.fileUrl ? msg.fileUrl.split('/').pop() : 'File', // Simplified file name extraction
+        timestamp: msg.createdAt,
+        optimistic: false // Ensure confirmed messages are not marked as optimistic
+    };
+
+    setMessages((prev) => ({
+        ...prev,
+        [partnerId]: [...(prev[partnerId] || []).filter(m => !m.optimistic), formattedMessage],
+    }));
+  };
+
+  // 2. Socket connection and listener setup
+  useEffect(() => {
+      if (!user?._id) return;
+      
+      // 1. Initialize Socket
+      // Ensure the endPoint is the base URL of the socket server (e.g., http://localhost:5000)
+      socket.current = io(endPoint, {
+          query: { userId: user._id, role: user.role },
+          withCredentials: true,
+      });
+
+      // 2. Join User Room (using socket id as room name for private messaging)
+      socket.current.emit("join", { userId: user._id, role: user.role });
+      console.log(`Socket client joined as: ${user._id}`);
+
+      // 3. Attach Listener
+      socket.current.on("chat-message", handleIncomingMessage);
+
+      // 4. Cleanup
+      return () => {
+          socket.current.off("chat-message", handleIncomingMessage);
+          socket.current.disconnect();
+      };
+  }, [user?._id, user?.role, endPoint]); 
+
+  // Scroll to bottom when messages update
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, selectedUser]);
+
+
+  // 3. Fetch chat history when selectedUser and rideId are available
+  useEffect(() => {
+    const fetchChatHistory = async () => {
+        if (!selectedUser || !rideIdFromQuery || !user?._id) return;
+
+        try {
+            console.log(`Fetching chat history for ride: ${rideIdFromQuery}`);
+            const res = await axios.get(`${endPoint}/chat/${rideIdFromQuery}`);
+            const history = res.data.history;
+
+            // Map the backend history format to the frontend state format
+            const formattedHistory = history.map(msg => ({
+                from: msg.senderId === user._id ? "me" : "other",
+                text: msg.message,
+                file: msg.fileUrl,
+                fileType: msg.fileType,
+                fileName: msg.fileUrl ? msg.fileUrl.split('/').pop() : 'File',
+                timestamp: msg.createdAt,
+                optimistic: false
+            }));
+
+            setMessages(prev => ({
+                ...prev,
+                [selectedUser.id]: formattedHistory,
+            }));
+
+        } catch (error) {
+            console.error("Failed to load chat history:", error.response?.data || error);
+            // Handle 404/no history gracefully by setting empty array
+            if (error.response?.status === 404) {
+                 setMessages(prev => ({ ...prev, [selectedUser.id]: [] }));
+            }
+        }
+    };
+
+    fetchChatHistory();
+
+  }, [selectedUser, rideIdFromQuery, user?._id, endPoint]);
+  
   // NEW: Fetch active ride and set chat users based on ride
   useEffect(() => {
     const fetchRideAndUser = async () => {
@@ -86,12 +184,9 @@ const Chat = () => {
     };
   
     fetchRideAndUser();
-  }, [endPoint, user?._id, rideIdFromQuery, userIdFromQuery, selectedUser]); // Include rideIdFromQuery
+  }, [endPoint, user?._id, rideIdFromQuery, userIdFromQuery, selectedUser]); 
 
-  // Removed the useEffect that manually sets selectedUser based on query params
-  // as the logic is now inside the fetchRideAndUser effect.
-
-  // NEW: Check if the user is selectable (i.e., if messaging is allowed)
+  // Check if the user is selectable (i.e., if messaging is allowed)
   const isUserSelectable = () => canSendMessages;
   
   const handleUserClick = (user) => {
@@ -100,11 +195,12 @@ const Chat = () => {
         // Updated navigation to include rideId
         navigate(`/dashboard/chat?user=${user.id}&rideId=${rideIdFromQuery}&rideStatus=${rideStatus}`);
     } else {
-         alert(`Chat is disabled. Ride status is: "${rideStatus}"`);
+        // IMPORTANT: Never use alert() in canvas, use a custom message box instead, but for now we keep it to fulfill the original logic.
+        alert(`Chat is disabled. Ride status is: "${rideStatus}"`); 
     }
   };
 
-  const handleSend = () => {
+  const handleSend = async () => { // Make function async
     // Check if messaging is allowed
     if (!canSendMessages) {
       alert("Messaging is only available when ride status is: accepted, on_the_way, or in_progress");
@@ -112,41 +208,97 @@ const Chat = () => {
     }
 
     if (!message.trim() && !selectedFile) return;
+    if (!selectedUser) return;
     
-    // TODO: Implement actual message/file sending to backend (ChatController.js) via API or Socket.IO
+    // Data required for both text and file
+    const chatData = {
+      rideId: rideIdFromQuery,
+      senderId: user._id,
+      senderRole: user.role, // Assuming user.role is "customer" or "driver"
+      recipientId: selectedUser.id,
+    };
 
-    let newMessage;
-    if (selectedFile) {
-      const url = URL.createObjectURL(selectedFile);
-      const fileType = selectedFile.type.startsWith("image/") ? "image" : "file";
+    try {
+        if (selectedFile) {
+            // --- File Sending Logic ---
+            const formData = new FormData();
+            formData.append("file", selectedFile);
+            formData.append("rideId", chatData.rideId);
+            formData.append("senderId", chatData.senderId);
+            formData.append("senderRole", chatData.senderRole);
+            formData.append("recipientId", chatData.recipientId);
+            
+            // Optimistic message creation (will be updated by socket later if successful)
+            const optimisticFileMessage = { 
+                from: "me",
+                file: URL.createObjectURL(selectedFile),
+                fileName: selectedFile.name,
+                fileType: selectedFile.type.startsWith("image/") ? "image" : "file", // Corrected file type logic
+                timestamp: new Date().toISOString(),
+                optimistic: true // Mark for potential update
+            };
 
-      newMessage = {
-        from: "me",
-        file: url,
-        fileName: selectedFile.name,
-        fileType,
-        timestamp: new Date().toISOString(),
-      };
-    } else {
-      newMessage = { 
-        from: "me", 
-        text: message,
-        timestamp: new Date().toISOString(),
-      };
+            setMessages((prev) => ({
+                ...prev,
+                [selectedUser.id]: [...(prev[selectedUser.id] || []).filter(m => !m.optimistic), optimisticFileMessage],
+            }));
+
+
+            const fileRes = await axios.post(`${endPoint}/chat/upload`, formData, {
+                headers: {
+                    "Content-Type": "multipart/form-data",
+                },
+            });
+
+            console.log("File sent:", fileRes.data.chat);
+            
+            // Clear inputs
+            setSelectedFile(null);
+            if (fileInputRef.current) fileInputRef.current.value = "";
+            if (imageInputRef.current) imageInputRef.current.value = "";
+
+            // NOTE: The successful message is handled by the socket listener (handleIncomingMessage),
+            // which handles the message based on the backend's emission. We remove the direct 
+            // state update here to rely on the single source of truth (the socket).
+
+        } else {
+            // --- Text Sending Logic ---
+            const textData = { ...chatData, text: message.trim() };
+           console.log(textData)
+            // Optimistic message creation (will be updated by socket later if successful)
+            const optimisticTextMessage = { 
+                from: "me",
+                text: message.trim(),
+                timestamp: new Date().toISOString(),
+                optimistic: true
+            };
+            setMessages((prev) => ({
+                ...prev,
+                [selectedUser.id]: [...(prev[selectedUser.id] || []).filter(m => !m.optimistic), optimisticTextMessage],
+            }));
+            
+            const textRes = await axios.post(`${endPoint}/chat/send`, textData);
+
+            console.log("Message sent:", textRes.data.chat);
+
+            // Clear message input
+            setMessage(""); 
+            
+            // NOTE: Relying on the socket listener (handleIncomingMessage) for final UI update.
+        }
+
+        setMessage(""); // Clear message input
+        
+    } catch (error) {
+        console.error("Failed to send message/file:", error.response?.data, error);
+        alert(`Failed to send message: ${error.response?.data?.message || error.message}`);
+        
+        // If an error occurs, you might want to filter out the optimistic message
+        setMessages((prev) => ({
+             ...prev,
+             [selectedUser.id]: (prev[selectedUser.id] || []).filter(m => !m.optimistic),
+        }));
     }
-
-    setMessages((prev) => ({
-      ...prev,
-      [selectedUser.id]: [...(prev[selectedUser.id] || []), newMessage],
-    }));
-
-    setMessage("");
-    if (selectedFile) {
-      setSelectedFile(null);
-    }
-
-    if (fileInputRef.current) fileInputRef.current.value = "";
-    if (imageInputRef.current) imageInputRef.current.value = "";
   };
 
   const handleBack = () => {
@@ -212,7 +364,7 @@ const Chat = () => {
     }
   }, [selectedFile]);
 
-  // NEW: Placeholder for chat recipient name
+  // Placeholder for chat recipient name
   const chatRecipientName = selectedUser?.firstname ? `${selectedUser.firstname} ${selectedUser.lastname || ''}` : "User";
 
   return (
@@ -223,10 +375,8 @@ const Chat = () => {
           selectedUser ? "translate-x-full sm:translate-x-0" : "translate-x-0"
         } sm:translate-x-0`}
       >
-                {/* MODIFIED HEADER LINE */}
-                <div className="p-4 text-xl font-bold border-b">
-            {/* Check for activeRide AND activeRide.status before displaying */}
-            {activeRide?.status ? `Active Ride Chat (${activeRide.status})` : 'Chats'}
+        <div className="p-4 text-xl font-bold border-b">
+          {activeRide?.status ? `Active Ride Chat (${activeRide.status})` : 'Chats'}
         </div>
         <ul>
           {users?.map((user) => (
@@ -254,9 +404,9 @@ const Chat = () => {
             </li>
           ))}
           {!activeRide && (
-              <li className="px-4 py-3 text-gray-500">
-                  No active ride to chat about.
-              </li>
+            <li className="px-4 py-3 text-gray-500">
+                No active ride to chat about.
+            </li>
           )}
         </ul>
       </div>
@@ -301,37 +451,40 @@ const Chat = () => {
                       : "bg-gray-200 text-gray-800"
                   }`}
                 >
-                  {msg.text && <span>{msg.text}</span>}
-                
-                  {msg.fileType === "image" && (
+                  {/* File/Image display logic */}
+                  {msg.fileType === "image" && msg.file ? (
                     <img
                       src={msg.file}
-                      alt={msg.fileName}
+                      alt={msg.fileName || "Shared image"}
                       className="w-[300px] h-[250px] rounded-md mt-1 object-cover"
                     />
-                  )}
-                
-                  {msg.fileType === "file" && (
+                  ) : msg.fileType && msg.file ? (
                     <a
                       href={msg.file}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="underline"
+                      className="underline flex items-center gap-1"
                     >
-                      {msg.fileName}
+                      <BsPaperclip />
+                      {msg.fileName || 'Download File'}
                     </a>
+                  ) : (
+                    // Text message display
+                    <span>{msg.text}</span>
                   )}
                   
                   {msg.timestamp && (
-                    <div className="text-xs opacity-70 mt-1">
+                    <div className={`text-xs opacity-70 mt-1 ${msg.from === "me" ? 'text-right' : 'text-left'}`}>
                       {new Date(msg.timestamp).toLocaleTimeString([], { 
                         hour: '2-digit', 
                         minute: '2-digit' 
                       })}
+                      {msg.optimistic && <span className="ml-2 text-yellow-300 font-bold">(Sending...)</span>}
                     </div>
                   )}
                 </div>
               ))}
+              <div ref={messagesEndRef} /> {/* Scroll target */}
             </div>
 
             {/* Input Area */}
