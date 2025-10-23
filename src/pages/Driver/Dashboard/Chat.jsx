@@ -67,7 +67,7 @@ const Chat = () => {
       
       // 1. Initialize Socket
       // Ensure the endPoint is the base URL of the socket server (e.g., http://localhost:5000)
-      socket.current = io(endPoint, {
+      socket.current = io("https://my-dipatch-backend.onrender.com", {
           query: { userId: user._id, role: user.role },
           withCredentials: true,
       });
@@ -99,8 +99,8 @@ const Chat = () => {
 
         try {
             console.log(`Fetching chat history for ride: ${rideIdFromQuery}`);
-            const res = await axios.get(`${endPoint}/chat/${rideIdFromQuery}`);
-            const history = res.data.history;
+            const res = await axios.get(`${endPoint}/chat/driver/${rideIdFromQuery}`, { withCredentials: true });
+            const history = res.data.messages;
 
             // Map the backend history format to the frontend state format
             const formattedHistory = history.map(msg => ({

@@ -11,10 +11,10 @@ const AuthProvider = ({ children }) => {
   // ✅ Fetch current user from backend
 const fetchCurrentUser = async () => {
     try {
-      const { data } = await axios.get(`${endPoint}/user/me`, {
+      const { data } = await axios.get(`${endPoint}/user/me/driver`, {
         withCredentials: true, // important!
       });
-      setUser(data); // set the current user
+      setUser(data.user); // set the current user
     } catch (err) {
       setUser(null);
       console.error("Fetch current user error:", err.response?.data || err.message);
