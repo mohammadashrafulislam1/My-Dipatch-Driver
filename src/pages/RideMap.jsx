@@ -4,7 +4,6 @@ import mapboxgl from "mapbox-gl";
 import mbxDirections from "@mapbox/mapbox-sdk/services/directions";
 import * as turf from "@turf/turf";
 import { FaArrowUp } from "react-icons/fa";
-// Import necessary React Icons
 import { FaArrowRight, FaReply, FaChevronCircleUp, FaCrosshairs, FaPlus, FaMinus, FaComments } from "react-icons/fa";
 import { endPoint } from "../Components/ForAPIs";
 import { useActiveRide } from "../contexts/ActiveRideContext";
@@ -20,11 +19,9 @@ const fetchCustomerData = async (customerId) => {
       throw new Error('Failed to fetch customer data');
     }
     const customerData = await response.json();
-    console.log(customerData);
     return customerData;
   } catch (error) {
     console.error('Error fetching customer data:', error);
-    // Fallback to mock data if backend fails
     return null;
   }
 };
@@ -55,7 +52,7 @@ const maneuverIcons = {
   "roundabout left": <FaChevronCircleUp className="transform -rotate-90" />,
   "arrive": <FaArrowUp className="text-green-500" />,
   "depart": <FaArrowUp className="text-blue-500" />,
-  "default": <FaArrowUp />, // fallback
+  "default": <FaArrowUp />,
 };
 
 export default function RideMap() {
@@ -70,7 +67,7 @@ export default function RideMap() {
   // Local state that holds the ride object we will use in this component
   const [rideData, setRideData] = useState(() => location.state ?? null);
 
-  // Map refs and other UI state
+  // Map refs and other UI state (all hooks declared unconditionally)
   const mapRef = useRef(null);
   const mapInstance = useRef(null);
   const [routePath, setRoutePath] = useState([]);
@@ -86,16 +83,14 @@ export default function RideMap() {
   // Initialize directly from localStorage for dark mode
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const saved = localStorage.getItem("darkMode");
-    return saved ? saved === "true" : false; // default = false if nothing saved
+    return saved ? saved === "true" : false;
   });
 
-  // Save dark mode to localStorage whenever it changes
   useEffect(() => {
     localStorage.setItem("darkMode", isDarkMode);
   }, [isDarkMode]);
 
   const [mapLoaded, setMapLoaded] = useState(false);
-  // NEW REFS for animation state
   const traveledRef = useRef(0);
   const animationRef = useRef(null);
   const intervalRef = useRef(null);
@@ -145,8 +140,7 @@ export default function RideMap() {
         const fetched = await fetchRideById(id);
         if (fetched && mounted) {
           setRideData(fetched);
-          // Optionally persist it to global context if you want a global active ride:
-          // startRide(fetched);
+          // Optionally: startRide(fetched);
         }
       }
     };
@@ -158,9 +152,6 @@ export default function RideMap() {
     };
   }, [location.state, params.id, globalActiveRide, startRide]);
 
-  // If rideData is not yet resolved, show placeholder
-  if (!rideData) return <p>No ride data</p>;
-
   // Update fetch customer when rideData changes
   useEffect(() => {
     if (rideData?.customerId) {
@@ -169,6 +160,8 @@ export default function RideMap() {
         .catch(() => setCustomer({ firstName: rideData.riderName || "Customer" }));
     } else if (rideData?.riderName) {
       setCustomer({ firstName: rideData.riderName });
+    } else {
+      setCustomer(null);
     }
   }, [rideData]);
 
@@ -200,7 +193,6 @@ export default function RideMap() {
         } else {
           mapInstance.current.addSource("route", { type: "geojson", data: route.geometry });
 
-          // stroke
           mapInstance.current.addLayer({
             id: "route-stroke",
             type: "line",
@@ -212,7 +204,6 @@ export default function RideMap() {
             },
           });
 
-          // main
           mapInstance.current.addLayer({
             id: "route",
             type: "line",
@@ -469,7 +460,6 @@ export default function RideMap() {
   // Phase 2: Add static elements and fetch route
   useEffect(() => {
     if (!mapLoaded || !mapInstance.current) return;
-
     fetchDirections();
 
     // --- Setup map event handlers
@@ -510,7 +500,6 @@ export default function RideMap() {
         }
       }
     };
-
   }, [mapLoaded, fetchDirections, rideData]);
 
   useEffect(() => () => clearInterval(intervalRef.current), []);
@@ -552,8 +541,6 @@ export default function RideMap() {
         setRemaining({ distance: 0, duration: 0 });
         setJourneyStarted(false);
         journeyActiveRef.current = false;
-        // Optionally mark ride as completed:
-        // updateRideStatus('completed');
         return;
       }
 
@@ -677,6 +664,20 @@ export default function RideMap() {
     };
   }, []);
 
+  // ---------- RENDER ----------
+  // Show a friendly loading/placeholder state if rideData is not available yet
+  if (!rideData) {
+    return (
+      <div className="w-full h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-lg font-medium">Loading ride...</p>
+          <p className="text-sm opacity-70">Resolving ride data — opening map shortly.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Main UI (same as before, using rideData)
   return (
     <div className="relative w-full h-screen overflow-hidden">
       <div ref={mapRef} className="w-full h-full" />
@@ -699,11 +700,9 @@ export default function RideMap() {
               </span>
 
               <div>
-                {/* Distance until turn - Use remaining.distance instead of currentInstruction.distance */}
                 <p className="text-4xl font-semibold mb-2 leading-none">
                   {(remaining.distance / 1609.34).toFixed(1)} mi
                 </p>
-                {/* Instruction text */}
                 <p className="text-sm font-normal">
                   {currentInstruction.instruction}
                 </p>
@@ -713,9 +712,10 @@ export default function RideMap() {
         </div>
       )}
 
+      {/* ... rest of UI unchanged (uses rideData) ... */}
+
       {/* RIGHT SIDE SETTINGS/WIDGETS */}
       <div className="absolute top-4 right-4 flex flex-col items-end space-y-2 z-20">
-        {/* Settings Icon (Top Right) */}
         <button className={`p-3 text-2xl rounded-xl shadow-lg ${isDarkMode ? "bg-gray-700 text-white" : "bg-white text-gray-900"}`}>
           ⚙️
         </button>
@@ -723,7 +723,7 @@ export default function RideMap() {
         <button
           onClick={() => {
             setIsDarkMode(!isDarkMode);
-            window.location.reload(); // reload if you still want it
+            window.location.reload();
           }}
           className={`p-3 text-2xl rounded-xl shadow-lg ${isDarkMode ? "bg-gray-700 text-white" : "bg-white text-gray-900"}`}
         >
@@ -733,30 +733,15 @@ export default function RideMap() {
 
       {/* CAMERA CONTROLS - Bottom Right */}
       <div className="absolute bottom-32 right-4 flex flex-col space-y-2 z-20">
-        {/* Center on Driver Button */}
-        <button
-          onClick={centerOnDriver}
-          className={`p-3 text-xl rounded-xl shadow-lg ${isDarkMode ? "bg-gray-700 text-white" : "bg-white text-gray-900"}`}
-          title="Center on driver"
-        >
+        <button onClick={centerOnDriver} className={`p-3 text-xl rounded-xl shadow-lg ${isDarkMode ? "bg-gray-700 text-white" : "bg-white text-gray-900"}`} title="Center on driver">
           <FaCrosshairs />
         </button>
 
-        {/* Zoom In Button */}
-        <button
-          onClick={zoomIn}
-          className={`p-3 text-xl rounded-xl shadow-lg ${isDarkMode ? "bg-gray-700 text-white" : "bg-white text-gray-900"}`}
-          title="Zoom in"
-        >
+        <button onClick={zoomIn} className={`p-3 text-xl rounded-xl shadow-lg ${isDarkMode ? "bg-gray-700 text-white" : "bg-white text-gray-900"}`} title="Zoom in">
           <FaPlus />
         </button>
 
-        {/* Zoom Out Button */}
-        <button
-          onClick={zoomOut}
-          className={`p-3 text-xl rounded-xl shadow-lg ${isDarkMode ? "bg-gray-700 text-white" : "bg-white text-gray-900"}`}
-          title="Zoom out"
-        >
+        <button onClick={zoomOut} className={`p-3 text-xl rounded-xl shadow-lg ${isDarkMode ? "bg-gray-700 text-white" : "bg-white text-gray-900"}`} title="Zoom out">
           <FaMinus />
         </button>
       </div>
@@ -771,52 +756,29 @@ export default function RideMap() {
 
       {/* BOTTOM NAVIGATION BAR (MATCHING DESIGN) */}
       <div className={`absolute flex gap-24 flex-row-reverse bottom-0 w-full shadow-2xl z-10 px-10`}>
-        {/* START JOURNEY BUTTON (When stopped) */}
         {!journeyStarted && routePath.length > 0 && (
-          <button
-            onClick={handleStartJourney}
-            className="text-center flex items-center justify-center mb-4 bg-gray-900 text-white w-28 h-24 rounded-full shadow-lg hover:bg-black font-bold"
-          >
-            <img src="https://i.ibb.co/Psm5vrxs/Gemini-Generated-Image-aaev1maaev1maaev-removebg-preview.png" alt=""
-              className=" w-28" />
+          <button onClick={handleStartJourney} className="text-center flex items-center justify-center mb-4 bg-gray-900 text-white w-28 h-24 rounded-full shadow-lg hover:bg-black font-bold">
+            <img src="https://i.ibb.co/Psm5vrxs/Gemini-Generated-Image-aaev1maaev1maaev-removebg-preview.png" alt="" className=" w-28" />
           </button>
         )}
 
-        {/* NAVIGATION INFO BAR (When running or initial state) */}
         <div className={`flex items-center w-full p-5 rounded-xl justify-between h-full ${isDarkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-900"}`}>
-          {/* Left Section: Menu Button */}
-          <button className={`p-2 rounded-full text-2xl ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-            &#x22EE; {/* Three vertical dots (More menu) */}
-          </button>
+          <button className={`p-2 rounded-full text-2xl ${isDarkMode ? "text-white" : "text-gray-900"}`}>⋮</button>
 
-          {/* Center Section: Time/Distance/Emoji */}
           <div className="flex-1 flex justify-center items-center">
             {journeyStarted ? (
-              // When Navigating (shows estimated time/arrival)
               <div className="text-center">
-                <p className="font-semibold text-sm">
-                  {(remaining.duration / 60).toFixed(0)} min
-                </p>
-                <p className="opacity-70 text-xs">
-                  ETA: {new Date(Date.now() + remaining.duration * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                </p>
+                <p className="font-semibold text-sm">{(remaining.duration / 60).toFixed(0)} min</p>
+                <p className="opacity-70 text-xs">ETA: {new Date(Date.now() + remaining.duration * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>
               </div>
             ) : (
-              // Initial state (shows total route time/distance)
               <div className="text-center">
-                <p className="font-bold text-lg">
-                  {new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                </p>
-                <p className="opacity-70 text-xs">{rideData.distance
-                  ? `${rideData.distance} • ${rideData.eta} min`
-                  : `${(remaining.distance / 1609.34).toFixed(1)} mi • ${rideData.eta} `
-                }
-                </p>
+                <p className="font-bold text-lg">{new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>
+                <p className="opacity-70 text-xs">{rideData.distance ? `${rideData.distance} • ${rideData.eta} min` : `${(remaining.distance / 1609.34).toFixed(1)} mi • ${rideData.eta}`}</p>
               </div>
             )}
           </div>
 
-          {/* CUSTOMER INFO - Top Left */}
           {customer && (
             <div className={` top-4 left-4 p-4 rounded-xl shadow-lg z-20 ${isDarkMode ? "bg-gray-800 text-white" : "bg-white text-gray-900"}`}>
               <div className="flex items-center gap-3">
@@ -824,25 +786,16 @@ export default function RideMap() {
                   {customer.firstName?.charAt(0)}
                 </div>
                 <div>
-                  <p className="font-semibold">
-                    {customer.firstName} {customer.lastName}
-                  </p>
-                  <p className="text-sm opacity-75">
-                    ⭐ {customer.rating || 4.8}
-                  </p>
+                  <p className="font-semibold">{customer.firstName} {customer.lastName}</p>
+                  <p className="text-sm opacity-75">⭐ {customer.rating || 4.8}</p>
                 </div>
 
-                <button
-                  onClick={handleChatWithCustomer}
-                  className={`p-3 rounded-full ${isDarkMode ? "bg-blue-600 hover:bg-blue-700" : "bg-blue-500 hover:bg-blue-600"} text-white ml-2`}
-                  title="Chat with customer"
-                >
+                <button onClick={handleChatWithCustomer} className={`p-3 rounded-full ${isDarkMode ? "bg-blue-600 hover:bg-blue-700" : "bg-blue-500 hover:bg-blue-600"} text-white ml-2`} title="Chat with customer">
                   <FaComments />
                 </button>
               </div>
             </div>
           )}
-
         </div>
       </div>
     </div>
