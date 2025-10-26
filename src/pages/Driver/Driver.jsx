@@ -1,3 +1,4 @@
+// Driver.jsx - UPDATED
 import { useEffect, useState } from "react";
 import { BiSupport, BiWalletAlt } from "react-icons/bi";
 import { BsCashCoin, BsChatLeftDots } from "react-icons/bs";
@@ -19,97 +20,129 @@ import useAuth from "../../Components/useAuth";
 import { endPoint } from "../../Components/ForAPIs";
 import FloatingDeactivateBtn from "../../Components/FloatingDeactivateBtn";
 import axios from "axios";
+import { useActiveRide } from "../../contexts/ActiveRideContext";
 
 // Fix Leaflet marker icon paths
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
-  iconRetinaUrl:
-    "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
 
 const Driver = () => {
-  const [position, setPosition] = useState([50.4452, -104.6189]); // default Regina
+  const [position, setPosition] = useState([50.4452, -104.6189]);
   const [cityName, setCityName] = useState("Regina, SK");
   const [showDropdown, setShowDropdown] = useState(false);
-  const {user, loading, logout} = useAuth();
+  const { user, loading, logout } = useAuth();
   const [isActive, setIsActive] = useState(false);
-  const [statusLoading, setStatusLoading] = useState(true); // NEW
- console.log(user?.profileImage)
+  const [statusLoading, setStatusLoading] = useState(true);
+  
+  // Use the global active ride context
+  const { isActive: globalActive, activeRide, startRide, endRide } = useActiveRide();
+
   const handleStartRide = async () => {
     try {
       await axios.put(`${endPoint}/user/${user._id}/status`, { status: "active" });
-      setIsActive(true); // update UI immediately
+      setIsActive(true);
+      // Start global ride with driver info
+      startRide({
+        status: "active",
+        driverId: user._id,
+        driverName: `${user.firstName} ${user.lastName}`,
+        type: "driver_available",
+        timestamp: new Date().toISOString()
+      });
     } catch (err) {
       console.error("Error activating driver:", err);
     }
   };
-  
+
   const handleLogout = async () => {
     try {
-      await logout();          // Call your existing logout function
-      window.location.href = "/"; // Full page reload to landing page
+      // End any active ride on logout
+      if (isActive || globalActive) {
+        endRide();
+      }
+      await logout();
+      window.location.href = "/";
     } catch (err) {
       console.error(err);
     }
   };
-// Fetch city coordinates dynamically
+
+ // In the Driver component, modify the isActive logic:
+// Sync local state with global state
 useEffect(() => {
-  const fetchUserStatus = async () => {
-    if (!user) {
-      setStatusLoading(false); // Stop loading if guest
-      return;
+  if (globalActive && activeRide) {
+    // Only set active if it's a real ride, not just driver available
+    if (activeRide.type === "active_ride" && 
+        ["accepted", "on_the_way", "in_progress"].includes(activeRide.status)) {
+      setIsActive(true);
+    } else if (activeRide.driverId === user?._id && activeRide.type === "driver_available") {
+      setIsActive(true);
     }
+  }
+}, [globalActive, activeRide, user?._id]);
 
-    setStatusLoading(true); // start loading
-    try {
-     console.log(user)
-      // Set city position if available
-      if (user?.city) {
-        try {
-          const geoRes = await fetch(
-            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(user?.city)}`
-          );
-          const geoData = await geoRes.json();
-          if (geoData && geoData.length > 0) {
-            setPosition([parseFloat(geoData[0].lat), parseFloat(geoData[0].lon)]);
-            setCityName(user?.city);
+  // Fetch city coordinates and user status
+  useEffect(() => {
+    const fetchUserStatus = async () => {
+      if (!user) {
+        setStatusLoading(false);
+        return;
+      }
+
+      setStatusLoading(true);
+      try {
+        // Set city position if available
+        if (user?.city) {
+          try {
+            const geoRes = await fetch(
+              `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(user?.city)}`
+            );
+            const geoData = await geoRes.json();
+            if (geoData && geoData.length > 0) {
+              setPosition([parseFloat(geoData[0].lat), parseFloat(geoData[0].lon)]);
+              setCityName(user?.city);
+            }
+          } catch (err) {
+            console.error("Error fetching city coordinates:", err);
           }
-        } catch (err) {
-          console.error("Error fetching city coordinates:", err);
         }
-      }
 
-      // Set active status
-      if (user?.status === "active") {
-        setIsActive(true);
-      } else {
+        // Set active status
+        if (user?.status === "active") {
+          setIsActive(true);
+        } else {
+          setIsActive(false);
+        }
+      } catch (err) {
+        console.error("Error fetching user status:", err);
         setIsActive(false);
+      } finally {
+        setStatusLoading(false);
       }
-    } catch (err) {
-      console.error("Error fetching user status:", err);
-      setIsActive(false);
-    } finally {
-      setStatusLoading(false); // stop loading
-    }
-  };
+    };
 
-  fetchUserStatus();
-}, [user]);
-
+    fetchUserStatus();
+  }, [user]);
 
   return (
     <div className="min-h-screen flex flex-col justify-between relative overflow-hidden font-sans bg-white">
       <DriverNotification isActive={isActive} />
 
+      {/* GlobalRideStatus is now in main.jsx, so we don't need it here */}
 
-{isActive && (
-  <FloatingDeactivateBtn
-    userId={user?._id}
-    onDeactivated={() => setIsActive(false)}
-  />
-)}
+      {isActive && (
+        <FloatingDeactivateBtn
+          userId={user?._id}
+          onDeactivated={() => {
+            setIsActive(false);
+            endRide(); // Also end the global ride
+          }}
+        />
+      )}
       {/* Top Bar and Menu */}
       <div className="absolute top-0 w-full z-10 flex justify-between items-start p-6 ">
         <div className="drawer hidden md:block">

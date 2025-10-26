@@ -5,13 +5,13 @@ import useAuth from "./useAuth";
 import { endPoint } from "./ForAPIs";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import { useActiveRide } from "../contexts/ActiveRideContext";
 
 export default function DriverNotification({ isActive }) {
   const { user } = useAuth();
   const [queue, setQueue] = useState([]);
   const [isVisible, setIsVisible] = useState(false);
   const [progress, setProgress] = useState(100);
-  const [activeRide, setActiveRide] = useState(null);
   const navigate = useNavigate();
 
   const timerRef = useRef(null);
@@ -20,6 +20,9 @@ export default function DriverNotification({ isActive }) {
   const audioRef = useRef(null);
 
   const DURATION = 20 * 1000; // 20 seconds
+
+  // Use ActiveRide context so accepted rides persist across pages
+  const { startRide } = useActiveRide();
 
   // Connect to socket
   useEffect(() => {
@@ -39,19 +42,18 @@ export default function DriverNotification({ isActive }) {
 
     socket.on("new-ride-request", (ride) => {
       console.log("🚕 New ride:", ride);
-    
+
       if (ride.status === "pending") {
         // Only add if not already in queue
-        setQueue(prev => {
-          const exists = prev.some(r => r._id === ride._id);
+        setQueue((prev) => {
+          const exists = prev.some((r) => r._id === ride._id);
           return exists ? prev : [...prev, ride];
         });
       } else {
         // If the ride is no longer pending, remove it from the queue
-        setQueue(prev => prev.filter(r => r._id !== ride._id));
+        setQueue((prev) => prev.filter((r) => r._id !== ride._id));
       }
     });
-    
 
     socket.on("connect_error", (err) => {
       console.error("❌ Socket error:", err.message);
@@ -76,7 +78,7 @@ export default function DriverNotification({ isActive }) {
       audioRef.current = new Audio("/notification.mp3");
       audioRef.current.loop = true;
     }
-    audioRef.current.play().catch(err => console.warn("🔇 Audio play failed:", err));
+    audioRef.current.play().catch((err) => console.warn("🔇 Audio play failed:", err));
   }
 
   function stopSound() {
@@ -109,7 +111,7 @@ export default function DriverNotification({ isActive }) {
   }
 
   function handleNextRide() {
-    setQueue(prev => prev.slice(1));
+    setQueue((prev) => prev.slice(1));
     setIsVisible(false);
     stopSound();
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -121,15 +123,12 @@ export default function DriverNotification({ isActive }) {
   async function handleAccept() {
     const ride = queue[0];
     if (!ride?._id) return;
-  
+
     try {
-      const res = await axios.put(
-        `${endPoint}/rides/status/${ride._id}`,
-        { status: "accepted" }
-      );
-  
+      const res = await axios.put(`${endPoint}/rides/status/${ride._id}`, { status: "accepted" });
+
       console.log("✅ Ride accepted:", res.data);
-  
+
       // Clear queue & stop notification
       setQueue([]);
       setIsVisible(false);
@@ -138,12 +137,12 @@ export default function DriverNotification({ isActive }) {
       if (progressRef.current) clearInterval(progressRef.current);
       timerRef.current = null;
       progressRef.current = null;
-  
+
+      // Persist active ride globally so GlobalRideStatus shows across pages
+      startRide(res.data);
+
       // Navigate to live map with ride data
       navigate(`/ride/${ride._id}`, { state: res.data });
-      // Show map screen after accepting
-      setActiveRide(res.data);
-   
     } catch (err) {
       console.error("❌ Failed to accept ride:", err);
     }
@@ -169,9 +168,7 @@ export default function DriverNotification({ isActive }) {
       <div className="p-5 space-y-4">
         {/* Delivery label */}
         <div className="flex justify-center">
-          <span className="bg-green-800 px-3 py-1 rounded-full text-sm font-semibold">
-            Delivery
-          </span>
+          <span className="bg-green-800 px-3 py-1 rounded-full text-sm font-semibold">Delivery</span>
         </div>
 
         {/* Price */}
@@ -196,15 +193,14 @@ export default function DriverNotification({ isActive }) {
           </div>
 
           {ride.midwayStops?.length > 0 &&
-  ride.midwayStops.map((stop, index) => {
-    return (
-      <div key={index} className="flex items-start space-x-2">
-        <MapPin size={18} className="text-yellow-500" />
-        <span>{stop.address}</span>
-      </div>
-    );
-  })}
-
+            ride.midwayStops.map((stop, index) => {
+              return (
+                <div key={index} className="flex items-start space-x-2">
+                  <MapPin size={18} className="text-yellow-500" />
+                  <span>{stop.address}</span>
+                </div>
+              );
+            })}
 
           <div className="flex items-start space-x-2">
             <MapPin size={18} className="text-red-500" />
