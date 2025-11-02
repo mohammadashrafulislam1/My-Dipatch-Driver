@@ -7,6 +7,8 @@ import { FaArrowUp } from "react-icons/fa";
 import { FaArrowRight, FaReply, FaChevronCircleUp, FaCrosshairs, FaPlus, FaMinus, FaComments } from "react-icons/fa";
 import { endPoint } from "../Components/ForAPIs";
 import { useActiveRide } from "../contexts/ActiveRideContext";
+import io from "socket.io-client";
+import useAuth from "../Components/useAuth";
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 const directionsClient = mbxDirections({ accessToken: mapboxgl.accessToken });
@@ -60,6 +62,26 @@ export default function RideMap() {
   const location = useLocation();
   const params = useParams(); // expects route /ride/:id
   const navigate = useNavigate();
+  const {user} = useAuth();
+  
+  const socketRef = useRef(null);
+  useEffect(() => {
+  if (!user?._id) return;
+
+  socketRef.current = io("https://my-dipatch-backend.onrender.com", {
+    transports: ["websocket"],
+    withCredentials: true,
+  });
+
+  const socket = socketRef.current;
+
+  socket.on("connect", () => {
+    console.log("Driver connected to socket:", socket.id);
+    socket.emit("join", { userId: user._id, role: "driver" });
+  });
+
+  return () => socket.disconnect();
+}, [user?._id]);
 
   // ActiveRideContext functions and globalActiveRide
   const { startRide, endRide, setIsActive, updateRideStatus, activeRide: globalActiveRide } = useActiveRide();
@@ -512,112 +534,145 @@ export default function RideMap() {
   };
 
   // Start navigation
-  const handleStartJourney = useCallback(() => {
-    if (!routePath.length || journeyActiveRef.current) return;
+const handleStartJourney = useCallback(async () => {
+  if (!routePath.length || journeyActiveRef.current) return;
 
-    setJourneyStarted(true);
-    journeyActiveRef.current = true;
+  setJourneyStarted(true);
+  journeyActiveRef.current = true;
 
-    setIsActive(true); // Set global active state
+  setIsActive(true); // Set global active state
 
-    // Update ride status locally and in global context
-    const updatedRide = {
-      ...rideData,
-      status: "on_the_way",
-      type: "active_ride"
-    };
+  // Update ride status locally and in global context
+  const updatedRide = {
+    ...rideData,
+    status: "in_progress", // Changed from "on_the_way" to "in_progress"
+    type: "active_ride"
+  };
 
-    startRide(updatedRide);
+  startRide(updatedRide);
 
-    const line = turf.lineString(routePath);
-    const routeLength = turf.length(line, { units: "kilometers" });
+  // 🔥 OPTIONAL: Update ride status in backend as well
+  try {
+    const response = await fetch(`${endPoint}/rides/status/${rideData._id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ status: 'in_progress' })
+    });
+    
+    if (response.ok) {
+      console.log('✅ Ride status updated to in_progress in backend');
+    } else {
+      console.warn('⚠️ Failed to update ride status in backend');
+    }
+  } catch (error) {
+    console.error('❌ Error updating ride status:', error);
+  }
 
-    let traveled = 0;
-    const speed = 0.003;
+  const line = turf.lineString(routePath);
+  const routeLength = turf.length(line, { units: "kilometers" });
 
-    const animate = () => {
-      if (traveled >= routeLength) {
-        setCurrentStep(instructions.length);
-        setRemaining({ distance: 0, duration: 0 });
-        setJourneyStarted(false);
-        journeyActiveRef.current = false;
-        return;
-      }
+  let traveled = 0;
+  const speed = 0.003;
 
-      const currentPoint = turf.along(line, traveled, { units: "kilometers" });
-      const nextPoint = turf.along(line, traveled + 0.01, { units: "kilometers" });
+  const animate = () => {
+    if (traveled >= routeLength) {
+      setCurrentStep(instructions.length);
+      setRemaining({ distance: 0, duration: 0 });
+      setJourneyStarted(false);
+      journeyActiveRef.current = false;
+      return;
+    }
 
-      const coords = currentPoint.geometry.coordinates;
-      const heading = turf.bearing(
-        turf.point(coords),
-        turf.point(nextPoint.geometry.coordinates)
+    const currentPoint = turf.along(line, traveled, { units: "kilometers" });
+    const nextPoint = turf.along(line, traveled + 0.01, { units: "kilometers" });
+
+    const coords = currentPoint.geometry.coordinates;
+    const heading = turf.bearing(
+      turf.point(coords),
+      turf.point(nextPoint.geometry.coordinates)
+    );
+
+    // Update driver marker
+    const driverSource = mapInstance.current.getSource("driver");
+    if (driverSource) {
+      driverSource.setData({
+        type: "FeatureCollection",
+        features: [
+          {
+            type: "Feature",
+            geometry: { type: "Point", coordinates: coords },
+            properties: { bearing: heading },
+          },
+        ],
+      });
+    }
+
+    // Emit live driver location to backend
+    if (socketRef.current && user?._id && rideData?._id) {
+      socketRef.current.emit("driver-location-update", {
+        driverId: user._id,
+        rideId: rideData._id,
+        customerId: rideData?.customerId,
+        location: {
+          lat: coords[1],
+          lng: coords[0],
+          bearing: heading,
+        },
+      });
+    }
+
+    // Update camera
+    mapInstance.current.easeTo({
+      center: coords,
+      zoom: 17,
+      pitch: 65,
+      bearing: heading,
+      duration: 100,
+      easing: (t) => t,
+    });
+
+    // --- Sync step with marker ---
+    const snapped = turf.nearestPointOnLine(line, currentPoint, { units: "kilometers" });
+    const traveledSoFar = snapped.properties.location; // total km along route
+
+    let currentStepIndex = 0;
+    let cumulative = 0;
+    let remainingDistance = 0;
+
+    for (let i = 0; i < stepSegments.length; i++) {
+      const segment = stepSegments[i];
+      const segmentLine = turf.lineString(
+        routePath.slice(segment.startIndex, segment.endIndex + 1)
       );
+      const segLength = turf.length(segmentLine, { units: "kilometers" });
 
-      // Update driver marker
-      const driverSource = mapInstance.current.getSource("driver");
-      if (driverSource) {
-        driverSource.setData({
-          type: "FeatureCollection",
-          features: [
-            {
-              type: "Feature",
-              geometry: { type: "Point", coordinates: coords },
-              properties: { bearing: heading },
-            },
-          ],
-        });
+      if (traveledSoFar >= cumulative && traveledSoFar <= cumulative + segLength) {
+        currentStepIndex = i;
+        remainingDistance = cumulative + segLength - traveledSoFar;
+        break;
       }
+      cumulative += segLength;
+    }
 
-      // Update camera
-      mapInstance.current.easeTo({
-        center: coords,
-        zoom: 17,
-        pitch: 65,
-        bearing: heading,
-        duration: 100,
-        easing: (t) => t,
-      });
+    // Update UI state
+    setCurrentStep(currentStepIndex);
+    setRemaining({
+      distance: remainingDistance * 1000, // meters
+      duration: (remainingDistance / 0.06) * 60, // minutes at 60 km/h
+    });
 
-      // --- Sync step with marker ---
-      const snapped = turf.nearestPointOnLine(line, currentPoint, { units: "kilometers" });
-      const traveledSoFar = snapped.properties.location; // total km along route
+    // Advance along route
+    traveled += speed;
 
-      let currentStepIndex = 0;
-      let cumulative = 0;
-      let remainingDistance = 0;
+    if (journeyActiveRef.current) {
+      requestAnimationFrame(animate);
+    }
+  };
 
-      for (let i = 0; i < stepSegments.length; i++) {
-        const segment = stepSegments[i];
-        const segmentLine = turf.lineString(
-          routePath.slice(segment.startIndex, segment.endIndex + 1)
-        );
-        const segLength = turf.length(segmentLine, { units: "kilometers" });
-
-        if (traveledSoFar >= cumulative && traveledSoFar <= cumulative + segLength) {
-          currentStepIndex = i;
-          remainingDistance = cumulative + segLength - traveledSoFar;
-          break;
-        }
-        cumulative += segLength;
-      }
-
-      // Update UI state
-      setCurrentStep(currentStepIndex);
-      setRemaining({
-        distance: remainingDistance * 1000, // meters
-        duration: (remainingDistance / 0.06) * 60, // minutes at 60 km/h
-      });
-
-      // Advance along route
-      traveled += speed;
-
-      if (journeyActiveRef.current) {
-        requestAnimationFrame(animate);
-      }
-    };
-
-    animate();
-  }, [routePath, instructions, stepSegments, startRide, setIsActive, rideData, updateRideStatus]);
+  animate();
+}, [routePath, instructions, stepSegments, startRide, setIsActive, rideData, updateRideStatus, user?._id]);
 
   useEffect(() => {
     return () => {
@@ -663,6 +718,15 @@ export default function RideMap() {
       journeyActiveRef.current = false;
     };
   }, []);
+
+  useEffect(() => {
+  return () => {
+    if (socketRef.current && user?._id) {
+      socketRef.current.emit("driver-location-stop", { driverId: user._id });
+    }
+  };
+}, [user?._id]);
+
 
   // ---------- RENDER ----------
   // Show a friendly loading/placeholder state if rideData is not available yet
