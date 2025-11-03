@@ -1,6 +1,7 @@
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useEffect, useRef, useState, useCallback } from "react";
 import mapboxgl from "mapbox-gl";
+import "mapbox-gl/dist/mapbox-gl.css"; // ADD THIS LINE - IMPORT MAPBOX CSS
 import mbxDirections from "@mapbox/mapbox-sdk/services/directions";
 import * as turf from "@turf/turf";
 import { FaArrowUp } from "react-icons/fa";
@@ -63,25 +64,12 @@ export default function RideMap() {
   const params = useParams(); // expects route /ride/:id
   const navigate = useNavigate();
   const {user} = useAuth();
-  
-  const socketRef = useRef(null);
-  useEffect(() => {
-  if (!user?._id) return;
+  const [driverLocation, setDriverLocation] = useState(null);
+  const [rideStatus, setRideStatus] = useState("in_progress");
+  const [isPaused, setIsPaused] = useState(false);
 
-  socketRef.current = io("https://my-dipatch-backend.onrender.com", {
-    transports: ["websocket"],
-    withCredentials: true,
-  });
-
-  const socket = socketRef.current;
-
-  socket.on("connect", () => {
-    console.log("Driver connected to socket:", socket.id);
-    socket.emit("join", { userId: user._id, role: "driver" });
-  });
-
-  return () => socket.disconnect();
-}, [user?._id]);
+  // Add driverMarker ref definition
+  const driverMarker = useRef(null);
 
   // ActiveRideContext functions and globalActiveRide
   const { startRide, endRide, setIsActive, updateRideStatus, activeRide: globalActiveRide } = useActiveRide();
@@ -186,6 +174,44 @@ export default function RideMap() {
       setCustomer(null);
     }
   }, [rideData]);
+
+  // Fix the pickup/dropoff reference error by moving this inside a useEffect that depends on rideData
+  useEffect(() => {
+    if (!driverLocation || !rideData?.pickup || !rideData?.dropoff) return;
+
+    const pickupDist = getDistance(driverLocation, [rideData.pickup.lng, rideData.pickup.lat]);
+    const dropoffDist = getDistance(driverLocation, [rideData.dropoff.lng, rideData.dropoff.lat]);
+
+    if (rideStatus === "in_progress" && pickupDist < 50) {
+      // Show Start Ride button or auto-trigger next step
+      console.log("Arrived at pickup location");
+    }
+
+    if (rideStatus === "on_the_way" && dropoffDist < 50) {
+      setRideStatus("completed");
+      // Optionally: send to backend
+      console.log("Arrived at dropoff location");
+    }
+  }, [driverLocation, rideData, rideStatus]);
+
+  const socketRef = useRef(null);
+  useEffect(() => {
+    if (!user?._id) return;
+
+    socketRef.current = io("https://my-dipatch-backend.onrender.com", {
+      transports: ["websocket"],
+      withCredentials: true,
+    });
+
+    const socket = socketRef.current;
+
+    socket.on("connect", () => {
+      console.log("Driver connected to socket:", socket.id);
+      socket.emit("join", { userId: user._id, role: "driver" });
+    });
+
+    return () => socket.disconnect();
+  }, [user?._id]);
 
   // Fetch directions and add layers (depends on map being loaded and rideData)
   const fetchDirections = useCallback(() => {
@@ -414,10 +440,10 @@ export default function RideMap() {
       });
   }, [rideData, isDarkMode]);
 
-  // Init map (Phase 1: Map Instance Creation)
+  // Init map (Phase 1: Map Instance Creation) - FIXED: Check if rideData exists
   useEffect(() => {
     if (!mapRef.current || mapInstance.current) return;
-    if (!rideData) return; // need rideData to set center
+    if (!rideData?.pickup) return; // need rideData to set center
 
     const mapStyle = isDarkMode
       ? "mapbox://styles/mapbox/navigation-night-v1"
@@ -477,11 +503,11 @@ export default function RideMap() {
         mapInstance.current = null;
       }
     };
-  }, [rideData, isDarkMode]);
+  }, [rideData, isDarkMode]); // Only create map when rideData is available
 
   // Phase 2: Add static elements and fetch route
   useEffect(() => {
-    if (!mapLoaded || !mapInstance.current) return;
+    if (!mapLoaded || !mapInstance.current || !rideData) return;
     fetchDirections();
 
     // --- Setup map event handlers
@@ -524,6 +550,43 @@ export default function RideMap() {
     };
   }, [mapLoaded, fetchDirections, rideData]);
 
+  // Geolocation effect - FIXED: Check if mapInstance exists
+  useEffect(() => {
+    if (navigator.geolocation) {
+      const watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          const { latitude, longitude } = pos.coords;
+          setDriverLocation([longitude, latitude]);
+
+          if (mapInstance.current) {
+            // Update marker
+            if (driverMarker.current) {
+              driverMarker.current.setLngLat([longitude, latitude]);
+            } else {
+              driverMarker.current = new mapboxgl.Marker({ color: "blue" })
+                .setLngLat([longitude, latitude])
+                .addTo(mapInstance.current);
+            }
+          }
+        },
+        (err) => console.error("Geolocation error:", err),
+        { enableHighAccuracy: true }
+      );
+      return () => navigator.geolocation.clearWatch(watchId);
+    }
+  }, []);
+
+  // Distance calculation function
+  const getDistance = (loc1, loc2) => {
+    const R = 6371e3;
+    const [lon1, lat1] = loc1.map((v) => (v * Math.PI) / 180);
+    const [lon2, lat2] = loc2.map((v) => (v * Math.PI) / 180);
+    const a = Math.sin((lat2 - lat1) / 2) ** 2 +
+              Math.cos(lat1) * Math.cos(lat2) *
+              Math.sin((lon2 - lon1) / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  };
+
   useEffect(() => () => clearInterval(intervalRef.current), []);
 
   // handle chat
@@ -534,145 +597,145 @@ export default function RideMap() {
   };
 
   // Start navigation
-const handleStartJourney = useCallback(async () => {
-  if (!routePath.length || journeyActiveRef.current) return;
+  const handleStartJourney = useCallback(async () => {
+    if (!routePath.length || journeyActiveRef.current || !rideData) return;
 
-  setJourneyStarted(true);
-  journeyActiveRef.current = true;
+    setJourneyStarted(true);
+    journeyActiveRef.current = true;
 
-  setIsActive(true); // Set global active state
+    setIsActive(true); // Set global active state
 
-  // Update ride status locally and in global context
-  const updatedRide = {
-    ...rideData,
-    status: "in_progress", // Changed from "on_the_way" to "in_progress"
-    type: "active_ride"
-  };
+    // Update ride status locally and in global context
+    const updatedRide = {
+      ...rideData,
+      status: "in_progress", // Changed from "on_the_way" to "in_progress"
+      type: "active_ride"
+    };
 
-  startRide(updatedRide);
+    startRide(updatedRide);
 
-  // 🔥 OPTIONAL: Update ride status in backend as well
-  try {
-    const response = await fetch(`${endPoint}/rides/status/${rideData._id}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ status: 'in_progress' })
-    });
-    
-    if (response.ok) {
-      console.log('✅ Ride status updated to in_progress in backend');
-    } else {
-      console.warn('⚠️ Failed to update ride status in backend');
-    }
-  } catch (error) {
-    console.error('❌ Error updating ride status:', error);
-  }
-
-  const line = turf.lineString(routePath);
-  const routeLength = turf.length(line, { units: "kilometers" });
-
-  let traveled = 0;
-  const speed = 0.003;
-
-  const animate = () => {
-    if (traveled >= routeLength) {
-      setCurrentStep(instructions.length);
-      setRemaining({ distance: 0, duration: 0 });
-      setJourneyStarted(false);
-      journeyActiveRef.current = false;
-      return;
-    }
-
-    const currentPoint = turf.along(line, traveled, { units: "kilometers" });
-    const nextPoint = turf.along(line, traveled + 0.01, { units: "kilometers" });
-
-    const coords = currentPoint.geometry.coordinates;
-    const heading = turf.bearing(
-      turf.point(coords),
-      turf.point(nextPoint.geometry.coordinates)
-    );
-
-    // Update driver marker
-    const driverSource = mapInstance.current.getSource("driver");
-    if (driverSource) {
-      driverSource.setData({
-        type: "FeatureCollection",
-        features: [
-          {
-            type: "Feature",
-            geometry: { type: "Point", coordinates: coords },
-            properties: { bearing: heading },
-          },
-        ],
-      });
-    }
-
-    // Emit live driver location to backend
-    if (socketRef.current && user?._id && rideData?._id) {
-      socketRef.current.emit("driver-location-update", {
-        driverId: user._id,
-        rideId: rideData._id,
-        customerId: rideData?.customerId,
-        location: {
-          lat: coords[1],
-          lng: coords[0],
-          bearing: heading,
+    // 🔥 OPTIONAL: Update ride status in backend as well
+    try {
+      const response = await fetch(`${endPoint}/rides/status/${rideData._id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify({ status: 'in_progress' })
       });
-    }
-
-    // Update camera
-    mapInstance.current.easeTo({
-      center: coords,
-      zoom: 17,
-      pitch: 65,
-      bearing: heading,
-      duration: 100,
-      easing: (t) => t,
-    });
-
-    // --- Sync step with marker ---
-    const snapped = turf.nearestPointOnLine(line, currentPoint, { units: "kilometers" });
-    const traveledSoFar = snapped.properties.location; // total km along route
-
-    let currentStepIndex = 0;
-    let cumulative = 0;
-    let remainingDistance = 0;
-
-    for (let i = 0; i < stepSegments.length; i++) {
-      const segment = stepSegments[i];
-      const segmentLine = turf.lineString(
-        routePath.slice(segment.startIndex, segment.endIndex + 1)
-      );
-      const segLength = turf.length(segmentLine, { units: "kilometers" });
-
-      if (traveledSoFar >= cumulative && traveledSoFar <= cumulative + segLength) {
-        currentStepIndex = i;
-        remainingDistance = cumulative + segLength - traveledSoFar;
-        break;
+      
+      if (response.ok) {
+        console.log('✅ Ride status updated to in_progress in backend');
+      } else {
+        console.warn('⚠️ Failed to update ride status in backend');
       }
-      cumulative += segLength;
+    } catch (error) {
+      console.error('❌ Error updating ride status:', error);
     }
 
-    // Update UI state
-    setCurrentStep(currentStepIndex);
-    setRemaining({
-      distance: remainingDistance * 1000, // meters
-      duration: (remainingDistance / 0.06) * 60, // minutes at 60 km/h
-    });
+    const line = turf.lineString(routePath);
+    const routeLength = turf.length(line, { units: "kilometers" });
 
-    // Advance along route
-    traveled += speed;
+    let traveled = 0;
+    const speed = 0.003;
 
-    if (journeyActiveRef.current) {
-      requestAnimationFrame(animate);
-    }
-  };
+    const animate = () => {
+      if (traveled >= routeLength) {
+        setCurrentStep(instructions.length);
+        setRemaining({ distance: 0, duration: 0 });
+        setJourneyStarted(false);
+        journeyActiveRef.current = false;
+        return;
+      }
 
-  animate();
-}, [routePath, instructions, stepSegments, startRide, setIsActive, rideData, updateRideStatus, user?._id]);
+      const currentPoint = turf.along(line, traveled, { units: "kilometers" });
+      const nextPoint = turf.along(line, traveled + 0.01, { units: "kilometers" });
+
+      const coords = currentPoint.geometry.coordinates;
+      const heading = turf.bearing(
+        turf.point(coords),
+        turf.point(nextPoint.geometry.coordinates)
+      );
+
+      // Update driver marker
+      const driverSource = mapInstance.current.getSource("driver");
+      if (driverSource) {
+        driverSource.setData({
+          type: "FeatureCollection",
+          features: [
+            {
+              type: "Feature",
+              geometry: { type: "Point", coordinates: coords },
+              properties: { bearing: heading },
+            },
+          ],
+        });
+      }
+
+      // Emit live driver location to backend
+      if (socketRef.current && user?._id && rideData?._id) {
+        socketRef.current.emit("driver-location-update", {
+          driverId: user._id,
+          rideId: rideData._id,
+          customerId: rideData?.customerId,
+          location: {
+            lat: coords[1],
+            lng: coords[0],
+            bearing: heading,
+          },
+        });
+      }
+
+      // Update camera
+      mapInstance.current.easeTo({
+        center: coords,
+        zoom: 17,
+        pitch: 65,
+        bearing: heading,
+        duration: 100,
+        easing: (t) => t,
+      });
+
+      // --- Sync step with marker ---
+      const snapped = turf.nearestPointOnLine(line, currentPoint, { units: "kilometers" });
+      const traveledSoFar = snapped.properties.location; // total km along route
+
+      let currentStepIndex = 0;
+      let cumulative = 0;
+      let remainingDistance = 0;
+
+      for (let i = 0; i < stepSegments.length; i++) {
+        const segment = stepSegments[i];
+        const segmentLine = turf.lineString(
+          routePath.slice(segment.startIndex, segment.endIndex + 1)
+        );
+        const segLength = turf.length(segmentLine, { units: "kilometers" });
+
+        if (traveledSoFar >= cumulative && traveledSoFar <= cumulative + segLength) {
+          currentStepIndex = i;
+          remainingDistance = cumulative + segLength - traveledSoFar;
+          break;
+        }
+        cumulative += segLength;
+      }
+
+      // Update UI state
+      setCurrentStep(currentStepIndex);
+      setRemaining({
+        distance: remainingDistance * 1000, // meters
+        duration: (remainingDistance / 0.06) * 60, // minutes at 60 km/h
+      });
+
+      // Advance along route
+      traveled += speed;
+
+      if (journeyActiveRef.current) {
+        requestAnimationFrame(animate);
+      }
+    };
+
+    animate();
+  }, [routePath, instructions, stepSegments, startRide, setIsActive, rideData, updateRideStatus, user?._id]);
 
   useEffect(() => {
     return () => {
@@ -720,13 +783,12 @@ const handleStartJourney = useCallback(async () => {
   }, []);
 
   useEffect(() => {
-  return () => {
-    if (socketRef.current && user?._id) {
-      socketRef.current.emit("driver-location-stop", { driverId: user._id });
-    }
-  };
-}, [user?._id]);
-
+    return () => {
+      if (socketRef.current && user?._id) {
+        socketRef.current.emit("driver-location-stop", { driverId: user._id });
+      }
+    };
+  }, [user?._id]);
 
   // ---------- RENDER ----------
   // Show a friendly loading/placeholder state if rideData is not available yet
@@ -775,8 +837,6 @@ const handleStartJourney = useCallback(async () => {
           </div>
         </div>
       )}
-
-      {/* ... rest of UI unchanged (uses rideData) ... */}
 
       {/* RIGHT SIDE SETTINGS/WIDGETS */}
       <div className="absolute top-4 right-4 flex flex-col items-end space-y-2 z-20">
@@ -843,23 +903,35 @@ const handleStartJourney = useCallback(async () => {
             )}
           </div>
 
-          {customer && (
-            <div className={` top-4 left-4 p-4 rounded-xl shadow-lg z-20 ${isDarkMode ? "bg-gray-800 text-white" : "bg-white text-gray-900"}`}>
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
-                  {customer.firstName?.charAt(0)}
-                </div>
-                <div>
-                  <p className="font-semibold">{customer.firstName} {customer.lastName}</p>
-                  <p className="text-sm opacity-75">⭐ {customer.rating || 4.8}</p>
-                </div>
+          <div className="absolute bottom-28 w-full flex justify-center z-50">
+            {rideStatus === "in_progress" && (
+              <button onClick={() => setRideStatus("on_the_way")} className="bg-blue-600 text-white px-6 py-3 rounded-full shadow-lg font-bold">
+                Start Ride
+              </button>
+            )}
 
-                <button onClick={handleChatWithCustomer} className={`p-3 rounded-full ${isDarkMode ? "bg-blue-600 hover:bg-blue-700" : "bg-blue-500 hover:bg-blue-600"} text-white ml-2`} title="Chat with customer">
-                  <FaComments />
-                </button>
-              </div>
-            </div>
-          )}
+            {rideStatus === "on_the_way" && !isPaused && (
+              <button onClick={() => setIsPaused(true)} className="bg-yellow-600 text-white px-6 py-3 rounded-full shadow-lg font-bold">
+                Stop Ride
+              </button>
+            )}
+
+            {isPaused && (
+              <button onClick={() => setIsPaused(false)} className="bg-green-600 text-white px-6 py-3 rounded-full shadow-lg font-bold">
+                Resume Ride
+              </button>
+            )}
+
+            {rideStatus === "completed" && (
+              <button className="bg-gray-700 text-white px-6 py-3 rounded-full shadow-lg font-bold" disabled>
+                Ride Completed
+              </button>
+            )}
+          </div>
+
+          <button onClick={handleChatWithCustomer} className={`p-2 rounded-full text-2xl ${isDarkMode ? "text-white" : "text-gray-900"}`} title="Chat with customer">
+            <FaComments />
+          </button>
         </div>
       </div>
     </div>
