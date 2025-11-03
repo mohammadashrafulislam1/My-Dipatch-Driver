@@ -132,6 +132,10 @@ html.dark textarea {
   @apply bg-white text-black border-gray-400;
 }
 
+/* Hide the floating status button when on a /ride/ page */
+body[data-page^="/ride/"] .global-ride-status {
+  display: none !important;
+}
 
 @tailwind base;
 @tailwind components;

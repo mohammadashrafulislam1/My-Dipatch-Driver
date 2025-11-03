@@ -43,7 +43,7 @@ const handleClick = () => {
       <button
         onClick={handleClick}
         aria-label="Open active ride"
-        className="hidden sm:flex fixed bottom-12 left-4 z-[9999] items-center gap-3
+        className="hidden global-ride-status sm:flex fixed bottom-12 left-4 z-[9999] items-center gap-3
                    bg-gradient-to-r from-green-500 to-green-600 text-white
                    px-4 py-3 rounded-2xl shadow-2xl transform transition-transform
                    hover:scale-105 focus:scale-105 focus:outline-none cursor-pointer"
@@ -94,7 +94,7 @@ const handleClick = () => {
       <button
         onClick={handleClick}
         aria-label="Open active ride"
-        className="sm:hidden fixed top-3 left-3 z-[9999] flex items-center gap-2
+        className="sm:hidden global-ride-status fixed top-3 left-3 z-[9999] flex items-center gap-2
                    bg-gradient-to-r from-green-500 to-green-600 text-white
                    px-3 py-2 rounded-xl shadow-lg transform transition-transform
                    hover:scale-105 focus:scale-105 focus:outline-none cursor-pointer"

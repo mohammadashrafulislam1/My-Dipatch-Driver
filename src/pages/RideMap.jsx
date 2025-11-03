@@ -69,7 +69,6 @@ export default function RideMap() {
   const [isPaused, setIsPaused] = useState(false);
   const [rideFinished, setRideFinished] = useState(false);
 
-  console.log("rideStatus", rideStatus)
   // Add driverMarker ref definition
   const driverMarker = useRef(null);
 
@@ -78,7 +77,6 @@ export default function RideMap() {
 
   // Local state that holds the ride object we will use in this component
   const [rideData, setRideData] = useState(() => location.state ?? null);
-  console.log(rideData)
   // Map refs and other UI state (all hooks declared unconditionally)
   const mapRef = useRef(null);
   const mapInstance = useRef(null);
@@ -217,12 +215,26 @@ export default function RideMap() {
     const socket = socketRef.current;
 
     socket.on("connect", () => {
-      console.log("Driver connected to socket:", socket.id);
       socket.emit("join", { userId: user._id, role: "driver" });
     });
 
     return () => socket.disconnect();
   }, [user?._id]);
+  // 🔧 Reusable status update helper
+const updateRideStat = async (id, status) => {
+  try {
+    const res = await fetch(`${endPoint}/rides/status/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    if (!res.ok) throw new Error(`Failed to update: ${status}`);
+    console.log(`✅ Ride status updated to: ${status}`);
+  } catch (err) {
+    console.error("❌ Ride status update failed:", err);
+  }
+};
+
 // ===== ADD THESE HANDLERS ABOVE THE RETURN =====
 
 // Move from current location → Pickup
@@ -230,19 +242,17 @@ const handleStartToPickup = useCallback(async () => {
   if (!driverLocation || !rideData?.pickup) return;
 
   setRideStatus("in_progress");
+  setJourneyStarted(true);
 
-  await fetch(`${endPoint}/rides/status/${rideData._id}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ status: "in_progress" }),
-  });
+        await updateRideStat(rideData._id, "in_progress");
+updateRideStatus("in_progress"); // ✅ Sync context
 
-  // ✅ Fetch real driving route: current location → pickup
+
   const directions = await directionsClient
     .getDirections({
       profile: "driving",
       geometries: "geojson",
-      steps: false,
+      steps: true, // ✅ must be true
       waypoints: [
         { coordinates: driverLocation },
         { coordinates: [rideData.pickup.lng, rideData.pickup.lat] },
@@ -255,85 +265,70 @@ const handleStartToPickup = useCallback(async () => {
   const line = turf.lineString(path);
   const totalDistance = turf.length(line, { units: "kilometers" });
 
+  // ✅ Extract instructions
+  const stepsData = [];
+  route.legs.forEach((leg) =>
+    leg.steps.forEach((step) => {
+      stepsData.push({
+        instruction: step.maneuver.instruction,
+        distance: step.distance,
+        duration: step.duration,
+        maneuver: step.maneuver,
+        coords: step.geometry.coordinates,
+      });
+    })
+  );
+  setInstructions(stepsData);
+  setCurrentStep(0);
+
   let traveled = 0;
   const speed = 0.003;
-// 🎨 Add the blue route line to the map
-if (mapInstance.current.getSource("pickup-route")) {
-  mapInstance.current.getSource("pickup-route").setData(line);
-} else {
-  mapInstance.current.addSource("pickup-route", {
-    type: "geojson",
-    data: line,
-  });
- mapInstance.current.addLayer({
-            id: "route-stroke",
-            type: "line",
-            source: "route",
-            layout: { "line-cap": "round", "line-join": "round" },
-            paint: {
-              "line-color": "#034880",
-              "line-width": 16,
-            },
-          });
 
-          mapInstance.current.addLayer({
-            id: "route",
-            type: "line",
-            source: "route",
-            layout: { "line-cap": "round", "line-join": "round" },
-            paint: {
-              "line-color": "#42A5F5",
-              "line-width": 10,
-            },
-          });
-}
   const animate = () => {
     if (traveled >= totalDistance) {
-      console.log("✅ Arrived at pickup, waiting for Go to Midway");
-      setRideStatus("in_progress"); // stay here, don’t auto-start next leg
-      return; // 🚫 stop animation here
+      console.log("✅ Arrived at pickup");
+      setJourneyStarted(false);
+      return;
     }
 
     const currentPoint = turf.along(line, traveled, { units: "kilometers" });
     const nextPoint = turf.along(line, traveled + 0.01, { units: "kilometers" });
     const coords = currentPoint.geometry.coordinates;
-    const heading = turf.bearing(
-      turf.point(coords),
-      turf.point(nextPoint.geometry.coordinates)
-    );
+    const heading = turf.bearing(turf.point(coords), turf.point(nextPoint.geometry.coordinates));
 
     // Move driver marker
     const driverSource = mapInstance.current.getSource("driver");
     if (driverSource) {
       driverSource.setData({
         type: "FeatureCollection",
-        features: [
-          {
-            type: "Feature",
-            geometry: { type: "Point", coordinates: coords },
-            properties: { bearing: heading },
-          },
-        ],
+        features: [{ type: "Feature", geometry: { type: "Point", coordinates: coords }, properties: { bearing: heading } }],
       });
     }
 
-    // Camera follow
+    // Follow camera
     mapInstance.current.easeTo({
       center: coords,
       zoom: 17,
       pitch: 65,
       bearing: heading,
       duration: 100,
-      easing: (t) => t,
     });
 
-    // Emit live driver location
-    socketRef.current?.emit("driver-location-update", {
-      driverId: user._id,
-      rideId: rideData._id,
-      customerId: rideData.customerId,
-      location: { lat: coords[1], lng: coords[0], bearing: heading },
-    });
+    // 🔄 Update step based on distance
+    let cumulative = 0;
+    for (let i = 0; i < stepsData.length; i++) {
+      const stepLine = turf.lineString(stepsData[i].coords);
+      const stepLength = turf.length(stepLine, { units: "kilometers" });
+      if (traveled <= cumulative + stepLength) {
+        setCurrentStep(i);
+        setRemaining({
+          distance: (totalDistance - traveled) * 1000,
+          duration: ((totalDistance - traveled) / 0.06) * 60,
+        });
+        break;
+      }
+      cumulative += stepLength;
+    }
 
     traveled += speed;
     requestAnimationFrame(animate);
@@ -341,6 +336,7 @@ if (mapInstance.current.getSource("pickup-route")) {
 
   animate();
 }, [driverLocation, rideData]);
+
 
 
 // Move from pickup → midway stop(s)
@@ -351,19 +347,17 @@ const handlePickupToMidway = useCallback(async () => {
   const midway = [rideData.midwayStops[0].lng, rideData.midwayStops[0].lat];
 
   setRideStatus("on_the_way");
+  setJourneyStarted(true); // ✅ Show instruction box
 
-  await fetch(`${endPoint}/rides/status/${rideData._id}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ status: "on_the_way" }),
-  });
+        await updateRideStat(rideData._id, "on_the_way");
+updateRideStatus("on_the_way"); // ✅ Sync context
 
-  // ✅ Fetch actual driving route using Mapbox Directions
+  // ✅ Fetch route with turn-by-turn steps
   const directions = await directionsClient
     .getDirections({
       profile: "driving",
       geometries: "geojson",
-      steps: false,
+      steps: true,
       waypoints: [
         { coordinates: pickup },
         { coordinates: midway },
@@ -376,25 +370,52 @@ const handlePickupToMidway = useCallback(async () => {
   const line = turf.lineString(path);
   const totalDistance = turf.length(line, { units: "kilometers" });
 
-  let traveled = 0;
-  const speed = 0.003;
+  // ✅ Extract maneuver steps
+  const stepsData = [];
+  route.legs.forEach((leg) =>
+    leg.steps.forEach((step) => {
+      stepsData.push({
+        instruction: step.maneuver.instruction,
+        distance: step.distance,
+        duration: step.duration,
+        maneuver: step.maneuver,
+        coords: step.geometry.coordinates,
+      });
+    })
+  );
 
-  const animate = () => {
-    if (traveled >= totalDistance) {
-      console.log("🛑 Arrived at midway stop, waiting for At Midway Stop button");
-      setRideStatus("at_stop"); // Stop here, don’t auto-start next leg
+  setInstructions(stepsData);
+  setCurrentStep(0);
+
+  let traveled = 0;
+  const speed = 0.003; // km per frame approx
+
+  const animate = async () => {
+    // 🏁 ARRIVAL DETECTION (with margin)
+    if (traveled >= totalDistance - 0.005) {
+      console.log("🛑 Arrived at midway stop");
+
+      // Stop navigation visuals
+      setJourneyStarted(false);
+      setRideStatus("at_stop");
+
+      // ✅ Await backend update (avoid premature exit)
+      try {
+        await updateRideStat(rideData._id, "at_stop");
+updateRideStatus("at_stop"); // ✅ Sync context
+      } catch (err) {
+        console.error("❌ Failed to update backend status:", err);
+      }
+
       return;
     }
 
     const currentPoint = turf.along(line, traveled, { units: "kilometers" });
     const nextPoint = turf.along(line, traveled + 0.01, { units: "kilometers" });
     const coords = currentPoint.geometry.coordinates;
-    const heading = turf.bearing(
-      turf.point(coords),
-      turf.point(nextPoint.geometry.coordinates)
-    );
+    const heading = turf.bearing(turf.point(coords), turf.point(nextPoint.geometry.coordinates));
 
-    // 🧭 Update driver marker position and heading
+    // 🧭 Update driver marker
     const driverSource = mapInstance.current.getSource("driver");
     if (driverSource) {
       driverSource.setData({
@@ -409,17 +430,16 @@ const handlePickupToMidway = useCallback(async () => {
       });
     }
 
-    // 🎥 Smoothly follow camera
+    // 🎥 Camera follow
     mapInstance.current.easeTo({
       center: coords,
       zoom: 17,
       pitch: 65,
       bearing: heading,
       duration: 100,
-      easing: (t) => t,
     });
 
-    // 📡 Emit real-time position to backend
+    // 📡 Emit live driver location
     socketRef.current?.emit("driver-location-update", {
       driverId: user._id,
       rideId: rideData._id,
@@ -427,12 +447,30 @@ const handlePickupToMidway = useCallback(async () => {
       location: { lat: coords[1], lng: coords[0], bearing: heading },
     });
 
+    // 🔄 Update turn instructions dynamically
+    let cumulative = 0;
+    for (let i = 0; i < stepsData.length; i++) {
+      const stepLine = turf.lineString(stepsData[i].coords);
+      const stepLength = turf.length(stepLine, { units: "kilometers" });
+      if (traveled <= cumulative + stepLength) {
+        setCurrentStep(i);
+        setRemaining({
+          distance: (totalDistance - traveled) * 1000,
+          duration: ((totalDistance - traveled) / 0.06) * 60, // ≈60 km/h
+        });
+        break;
+      }
+      cumulative += stepLength;
+    }
+
+    // 🚗 Move forward
     traveled += speed;
     requestAnimationFrame(animate);
   };
 
   animate();
-}, [rideData]);
+}, [rideData, mapInstance, user]);
+
 
 
 // Stop at midway stop
@@ -455,19 +493,18 @@ const handleMidwayToDropoff = useCallback(async () => {
   const end = [rideData.dropoff.lng, rideData.dropoff.lat];
 
   setRideStatus("on_the_way");
+  setJourneyStarted(true); // ✅ Show instructions panel
 
-  await fetch(`${endPoint}/rides/status/${rideData._id}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ status: "on_the_way" }),
-  });
+ 
+        await updateRideStat(rideData._id, "on_the_way");
+updateRideStatus("on_the_way"); // ✅ Sync context
 
-  // ✅ Fetch real driving route using Mapbox Directions API
+  // ✅ Fetch real driving route with turn-by-turn steps
   const directions = await directionsClient
     .getDirections({
       profile: "driving",
       geometries: "geojson",
-      steps: false,
+      steps: true, // ✅ MUST be true for instructions
       waypoints: [
         { coordinates: start },
         { coordinates: end },
@@ -480,14 +517,33 @@ const handleMidwayToDropoff = useCallback(async () => {
   const line = turf.lineString(path);
   const totalDistance = turf.length(line, { units: "kilometers" });
 
+  // ✅ Extract detailed step-by-step instructions
+  const stepsData = [];
+  route.legs.forEach((leg) =>
+    leg.steps.forEach((step) => {
+      stepsData.push({
+        instruction: step.maneuver.instruction,
+        distance: step.distance,
+        duration: step.duration,
+        maneuver: step.maneuver,
+        coords: step.geometry.coordinates,
+      });
+    })
+  );
+
+  setInstructions(stepsData);
+  setCurrentStep(0);
+
   let traveled = 0;
   const speed = 0.003;
 
   const animate = () => {
     if (traveled >= totalDistance) {
       console.log("🏁 Arrived at dropoff — waiting for Finish Ride click");
-      setRideStatus("completed"); // ✅ stop but don’t mark finished in backend
-      return; // 🚫 stop animation here (no auto-finish)
+      
+      setRideStatus("completed");
+      setJourneyStarted(false); // ✅ Hide instructions when done
+      return;
     }
 
     const currentPoint = turf.along(line, traveled, { units: "kilometers" });
@@ -523,7 +579,7 @@ const handleMidwayToDropoff = useCallback(async () => {
       easing: (t) => t,
     });
 
-    // 📡 Emit live driver location
+    // 📡 Emit driver location
     socketRef.current?.emit("driver-location-update", {
       driverId: user._id,
       rideId: rideData._id,
@@ -531,26 +587,40 @@ const handleMidwayToDropoff = useCallback(async () => {
       location: { lat: coords[1], lng: coords[0], bearing: heading },
     });
 
+    // 🔄 Update current step dynamically
+    let cumulative = 0;
+    for (let i = 0; i < stepsData.length; i++) {
+      const stepLine = turf.lineString(stepsData[i].coords);
+      const stepLength = turf.length(stepLine, { units: "kilometers" });
+      if (traveled <= cumulative + stepLength) {
+        setCurrentStep(i);
+        setRemaining({
+          distance: (totalDistance - traveled) * 1000,
+          duration: ((totalDistance - traveled) / 0.06) * 60, // ~60 km/h
+        });
+        break;
+      }
+      cumulative += stepLength;
+    }
+
     traveled += speed;
     requestAnimationFrame(animate);
   };
 
   animate();
-}, [rideData]);
+}, [rideData, mapInstance, user]);
+
 
 
 // Finish ride
 const handleFinishRide = async () => {
   setRideStatus("completed");
-  await fetch(`${endPoint}/rides/status/${rideData._id}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ status: "completed" }),
-  });
+  
+        await updateRideStat(rideData._id, "completed");
+updateRideStatus("completed"); // ✅ Sync context
   console.log("🏁 Ride completed");
 };
 
-      console.log(driverLocation)
   // Fetch directions and add layers (depends on map being loaded and rideData)
   const fetchDirections = useCallback(() => {
     if (!mapInstance.current || !rideData) return;
@@ -939,7 +1009,7 @@ if (driverLocation && rideData?.pickup) {
 
     currentMap.on('mouseleave', 'dropoff-layer', (e) => {
       currentMap.getCanvas().style.cursor = '';
-      e.features[0].popupInstance?.remove();
+      e?.features[0].popupInstance?.remove();
     });
 
     // Cleanup function for event listeners
@@ -1003,7 +1073,7 @@ if (driverLocation && rideData?.pickup) {
     }
   };
 
-  // Start navigation
+  // Start navigation do not need it anymore
   const handleStartJourney = useCallback(async () => {
     if (!routePath.length || journeyActiveRef.current || !rideData) return;
 
@@ -1216,6 +1286,7 @@ if (driverLocation && rideData?.pickup) {
       <div ref={mapRef} className="w-full h-full" />
 
       {/* TOP NAVIGATION HEADER (MATCHING DESIGN) */}
+      
       {journeyStarted && currentInstruction && (
         <div className="absolute top-0 left-0 right-0 p-3 z-10 flex justify-between items-start">
           {/* Left: Instruction Box */}

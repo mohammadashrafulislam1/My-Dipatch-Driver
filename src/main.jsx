@@ -30,6 +30,7 @@ const AppWrapper = ({ children }) => {
     </div>
   );
 };
+document.body.setAttribute("data-page", window.location.pathname);
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
