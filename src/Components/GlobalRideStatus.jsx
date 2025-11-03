@@ -3,7 +3,7 @@ import { FaCar, FaMapMarkerAlt, FaChevronRight } from 'react-icons/fa';
 
 const GlobalRideStatus = () => {
   const { isActive, activeRide } = useActiveRide();
-
+   console.log(activeRide)
   const shouldShow =
     isActive &&
     activeRide &&

@@ -65,9 +65,11 @@ export default function RideMap() {
   const navigate = useNavigate();
   const {user} = useAuth();
   const [driverLocation, setDriverLocation] = useState(null);
-  const [rideStatus, setRideStatus] = useState("in_progress");
+  const [rideStatus, setRideStatus] = useState("accepted");
   const [isPaused, setIsPaused] = useState(false);
+  const [rideFinished, setRideFinished] = useState(false);
 
+  console.log("rideStatus", rideStatus)
   // Add driverMarker ref definition
   const driverMarker = useRef(null);
 
@@ -76,7 +78,7 @@ export default function RideMap() {
 
   // Local state that holds the ride object we will use in this component
   const [rideData, setRideData] = useState(() => location.state ?? null);
-
+  console.log(rideData)
   // Map refs and other UI state (all hooks declared unconditionally)
   const mapRef = useRef(null);
   const mapInstance = useRef(null);
@@ -95,6 +97,15 @@ export default function RideMap() {
     const saved = localStorage.getItem("darkMode");
     return saved ? saved === "true" : false;
   });
+  
+  useEffect(() => {
+    console.log(rideData)
+  if (rideData?.status === "completed") {
+    setRideFinished(true);
+    setRideStatus("completed");
+  }
+}, [rideData]);
+
 
   useEffect(() => {
     localStorage.setItem("darkMode", isDarkMode);
@@ -212,7 +223,334 @@ export default function RideMap() {
 
     return () => socket.disconnect();
   }, [user?._id]);
+// ===== ADD THESE HANDLERS ABOVE THE RETURN =====
 
+// Move from current location → Pickup
+const handleStartToPickup = useCallback(async () => {
+  if (!driverLocation || !rideData?.pickup) return;
+
+  setRideStatus("in_progress");
+
+  await fetch(`${endPoint}/rides/status/${rideData._id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status: "in_progress" }),
+  });
+
+  // ✅ Fetch real driving route: current location → pickup
+  const directions = await directionsClient
+    .getDirections({
+      profile: "driving",
+      geometries: "geojson",
+      steps: false,
+      waypoints: [
+        { coordinates: driverLocation },
+        { coordinates: [rideData.pickup.lng, rideData.pickup.lat] },
+      ],
+    })
+    .send();
+
+  const route = directions.body.routes[0];
+  const path = route.geometry.coordinates;
+  const line = turf.lineString(path);
+  const totalDistance = turf.length(line, { units: "kilometers" });
+
+  let traveled = 0;
+  const speed = 0.003;
+// 🎨 Add the blue route line to the map
+if (mapInstance.current.getSource("pickup-route")) {
+  mapInstance.current.getSource("pickup-route").setData(line);
+} else {
+  mapInstance.current.addSource("pickup-route", {
+    type: "geojson",
+    data: line,
+  });
+ mapInstance.current.addLayer({
+            id: "route-stroke",
+            type: "line",
+            source: "route",
+            layout: { "line-cap": "round", "line-join": "round" },
+            paint: {
+              "line-color": "#034880",
+              "line-width": 16,
+            },
+          });
+
+          mapInstance.current.addLayer({
+            id: "route",
+            type: "line",
+            source: "route",
+            layout: { "line-cap": "round", "line-join": "round" },
+            paint: {
+              "line-color": "#42A5F5",
+              "line-width": 10,
+            },
+          });
+}
+  const animate = () => {
+    if (traveled >= totalDistance) {
+      console.log("✅ Arrived at pickup, waiting for Go to Midway");
+      setRideStatus("in_progress"); // stay here, don’t auto-start next leg
+      return; // 🚫 stop animation here
+    }
+
+    const currentPoint = turf.along(line, traveled, { units: "kilometers" });
+    const nextPoint = turf.along(line, traveled + 0.01, { units: "kilometers" });
+    const coords = currentPoint.geometry.coordinates;
+    const heading = turf.bearing(
+      turf.point(coords),
+      turf.point(nextPoint.geometry.coordinates)
+    );
+
+    // Move driver marker
+    const driverSource = mapInstance.current.getSource("driver");
+    if (driverSource) {
+      driverSource.setData({
+        type: "FeatureCollection",
+        features: [
+          {
+            type: "Feature",
+            geometry: { type: "Point", coordinates: coords },
+            properties: { bearing: heading },
+          },
+        ],
+      });
+    }
+
+    // Camera follow
+    mapInstance.current.easeTo({
+      center: coords,
+      zoom: 17,
+      pitch: 65,
+      bearing: heading,
+      duration: 100,
+      easing: (t) => t,
+    });
+
+    // Emit live driver location
+    socketRef.current?.emit("driver-location-update", {
+      driverId: user._id,
+      rideId: rideData._id,
+      customerId: rideData.customerId,
+      location: { lat: coords[1], lng: coords[0], bearing: heading },
+    });
+
+    traveled += speed;
+    requestAnimationFrame(animate);
+  };
+
+  animate();
+}, [driverLocation, rideData]);
+
+
+// Move from pickup → midway stop(s)
+const handlePickupToMidway = useCallback(async () => {
+  if (!rideData?.pickup || !rideData?.midwayStops?.length) return;
+
+  const pickup = [rideData.pickup.lng, rideData.pickup.lat];
+  const midway = [rideData.midwayStops[0].lng, rideData.midwayStops[0].lat];
+
+  setRideStatus("on_the_way");
+
+  await fetch(`${endPoint}/rides/status/${rideData._id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status: "on_the_way" }),
+  });
+
+  // ✅ Fetch actual driving route using Mapbox Directions
+  const directions = await directionsClient
+    .getDirections({
+      profile: "driving",
+      geometries: "geojson",
+      steps: false,
+      waypoints: [
+        { coordinates: pickup },
+        { coordinates: midway },
+      ],
+    })
+    .send();
+
+  const route = directions.body.routes[0];
+  const path = route.geometry.coordinates;
+  const line = turf.lineString(path);
+  const totalDistance = turf.length(line, { units: "kilometers" });
+
+  let traveled = 0;
+  const speed = 0.003;
+
+  const animate = () => {
+    if (traveled >= totalDistance) {
+      console.log("🛑 Arrived at midway stop, waiting for At Midway Stop button");
+      setRideStatus("at_stop"); // Stop here, don’t auto-start next leg
+      return;
+    }
+
+    const currentPoint = turf.along(line, traveled, { units: "kilometers" });
+    const nextPoint = turf.along(line, traveled + 0.01, { units: "kilometers" });
+    const coords = currentPoint.geometry.coordinates;
+    const heading = turf.bearing(
+      turf.point(coords),
+      turf.point(nextPoint.geometry.coordinates)
+    );
+
+    // 🧭 Update driver marker position and heading
+    const driverSource = mapInstance.current.getSource("driver");
+    if (driverSource) {
+      driverSource.setData({
+        type: "FeatureCollection",
+        features: [
+          {
+            type: "Feature",
+            geometry: { type: "Point", coordinates: coords },
+            properties: { bearing: heading },
+          },
+        ],
+      });
+    }
+
+    // 🎥 Smoothly follow camera
+    mapInstance.current.easeTo({
+      center: coords,
+      zoom: 17,
+      pitch: 65,
+      bearing: heading,
+      duration: 100,
+      easing: (t) => t,
+    });
+
+    // 📡 Emit real-time position to backend
+    socketRef.current?.emit("driver-location-update", {
+      driverId: user._id,
+      rideId: rideData._id,
+      customerId: rideData.customerId,
+      location: { lat: coords[1], lng: coords[0], bearing: heading },
+    });
+
+    traveled += speed;
+    requestAnimationFrame(animate);
+  };
+
+  animate();
+}, [rideData]);
+
+
+// Stop at midway stop
+const handleAtMidwayStop = async () => {
+  setRideStatus("at_stop");
+  await fetch(`${endPoint}/rides/status/${rideData._id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status: "at_stop" }),
+  });
+  console.log("🛑 Reached midway stop");
+};
+
+// Move from midway stop → drop-off
+const handleMidwayToDropoff = useCallback(async () => {
+  const midway = rideData.midwayStops?.[0];
+  if (!midway || !rideData.dropoff) return;
+
+  const start = [midway.lng, midway.lat];
+  const end = [rideData.dropoff.lng, rideData.dropoff.lat];
+
+  setRideStatus("on_the_way");
+
+  await fetch(`${endPoint}/rides/status/${rideData._id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status: "on_the_way" }),
+  });
+
+  // ✅ Fetch real driving route using Mapbox Directions API
+  const directions = await directionsClient
+    .getDirections({
+      profile: "driving",
+      geometries: "geojson",
+      steps: false,
+      waypoints: [
+        { coordinates: start },
+        { coordinates: end },
+      ],
+    })
+    .send();
+
+  const route = directions.body.routes[0];
+  const path = route.geometry.coordinates;
+  const line = turf.lineString(path);
+  const totalDistance = turf.length(line, { units: "kilometers" });
+
+  let traveled = 0;
+  const speed = 0.003;
+
+  const animate = () => {
+    if (traveled >= totalDistance) {
+      console.log("🏁 Arrived at dropoff — waiting for Finish Ride click");
+      setRideStatus("completed"); // ✅ stop but don’t mark finished in backend
+      return; // 🚫 stop animation here (no auto-finish)
+    }
+
+    const currentPoint = turf.along(line, traveled, { units: "kilometers" });
+    const nextPoint = turf.along(line, traveled + 0.01, { units: "kilometers" });
+    const coords = currentPoint.geometry.coordinates;
+    const heading = turf.bearing(
+      turf.point(coords),
+      turf.point(nextPoint.geometry.coordinates)
+    );
+
+    // 🧭 Update driver marker
+    const driverSource = mapInstance.current.getSource("driver");
+    if (driverSource) {
+      driverSource.setData({
+        type: "FeatureCollection",
+        features: [
+          {
+            type: "Feature",
+            geometry: { type: "Point", coordinates: coords },
+            properties: { bearing: heading },
+          },
+        ],
+      });
+    }
+
+    // 🎥 Smooth camera follow
+    mapInstance.current.easeTo({
+      center: coords,
+      zoom: 17,
+      pitch: 65,
+      bearing: heading,
+      duration: 100,
+      easing: (t) => t,
+    });
+
+    // 📡 Emit live driver location
+    socketRef.current?.emit("driver-location-update", {
+      driverId: user._id,
+      rideId: rideData._id,
+      customerId: rideData.customerId,
+      location: { lat: coords[1], lng: coords[0], bearing: heading },
+    });
+
+    traveled += speed;
+    requestAnimationFrame(animate);
+  };
+
+  animate();
+}, [rideData]);
+
+
+// Finish ride
+const handleFinishRide = async () => {
+  setRideStatus("completed");
+  await fetch(`${endPoint}/rides/status/${rideData._id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status: "completed" }),
+  });
+  console.log("🏁 Ride completed");
+};
+
+      console.log(driverLocation)
   // Fetch directions and add layers (depends on map being loaded and rideData)
   const fetchDirections = useCallback(() => {
     if (!mapInstance.current || !rideData) return;
@@ -234,6 +572,75 @@ export default function RideMap() {
 
         const route = res.body.routes[0];
         const path = route.geometry.coordinates;
+// --- Blue line: current location → pickup (real route) ---
+if (driverLocation && rideData?.pickup) {
+  directionsClient
+    .getDirections({
+      profile: "driving",
+      geometries: "geojson",
+      steps: false,
+      waypoints: [
+        { coordinates: driverLocation },
+        { coordinates: [rideData.pickup.lng, rideData.pickup.lat] },
+      ],
+    })
+    .send()
+    .then((res) => {
+      const route = res.body.routes[0];
+      const geojson = {
+        type: "Feature",
+        geometry: route.geometry,
+      };
+
+      if (mapInstance.current.getSource("current-to-pickup")) {
+        mapInstance.current.getSource("current-to-pickup").setData(geojson);
+      } else {
+        mapInstance.current.addSource("current-to-pickup", {
+          type: "geojson",
+          data: geojson,
+        });
+
+        // ✅ Add stroke line first (under driver)
+        mapInstance.current.addLayer(
+          {
+            id: "current-to-pickup-stroke",
+            type: "line",
+            source: "current-to-pickup",
+            layout: {
+              "line-cap": "round",
+              "line-join": "round",
+            },
+            paint: {
+              "line-color": "#034880",
+              "line-width": 14,
+            },
+          },
+          "driver-layer" // 👈 Insert before driver marker layer
+        );
+
+        // ✅ Then add inner bright line (also under driver)
+        mapInstance.current.addLayer(
+          {
+            id: "current-to-pickup-line",
+            type: "line",
+            source: "current-to-pickup",
+            layout: {
+              "line-cap": "round",
+              "line-join": "round",
+            },
+            paint: {
+              "line-color": "#42A5F5",
+              "line-width": 8,
+            },
+          },
+          "driver-layer" // 👈 Also before the driver marker
+        );
+      }
+    })
+    .catch((err) => console.error("Failed to fetch current→pickup route:", err));
+}
+
+
 
         // --- Route line ---
         if (mapInstance.current.getSource("route")) {
@@ -263,35 +670,35 @@ export default function RideMap() {
             },
           });
         }
-
         // --- Driver marker ---
-        if (!mapInstance.current.getSource("driver")) {
-          mapInstance.current.addSource("driver", {
-            type: "geojson",
-            data: {
-              type: "FeatureCollection",
-              features: [
-                {
-                  type: "Feature",
-                  geometry: { type: "Point", coordinates: [rideData.pickup.lng, rideData.pickup.lat] },
-                  properties: { bearing: 0 },
-                },
-              ],
-            },
-          });
+        if (!mapInstance.current.getSource("driver") && driverLocation) {
+  mapInstance.current.addSource("driver", {
+    type: "geojson",
+    data: {
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          geometry: { type: "Point", coordinates: driverLocation },
+          properties: { bearing: 0 },
+        },
+      ],
+    },
+  });
 
-          mapInstance.current.addLayer({
-            id: "driver-layer",
-            type: "symbol",
-            source: "driver",
-            layout: {
-              "icon-image": "arrow-icon",
-              "icon-size": 0.2,
-              "icon-rotate": ["get", "bearing"],
-              "icon-rotation-alignment": "map",
-              "icon-allow-overlap": true,
-            },
-          });
+         mapInstance.current.addLayer({
+  id: "driver-layer",
+  type: "symbol",
+  source: "driver",
+  layout: {
+    "icon-image": "arrow-icon",
+    "icon-size": 0.25,
+    "icon-rotate": ["get", "bearing"],
+    "icon-rotation-alignment": "map",
+    "icon-allow-overlap": true,
+  },
+});
+
         }
 
         // --- Pickup label ---
@@ -438,7 +845,7 @@ export default function RideMap() {
       .catch((err) => {
         console.error("Directions API error", err);
       });
-  }, [rideData, isDarkMode]);
+  }, [rideData, isDarkMode, driverLocation]);
 
   // Init map (Phase 1: Map Instance Creation) - FIXED: Check if rideData exists
   useEffect(() => {
@@ -560,13 +967,13 @@ export default function RideMap() {
 
           if (mapInstance.current) {
             // Update marker
-            if (driverMarker.current) {
-              driverMarker.current.setLngLat([longitude, latitude]);
-            } else {
-              driverMarker.current = new mapboxgl.Marker({ color: "blue" })
-                .setLngLat([longitude, latitude])
-                .addTo(mapInstance.current);
-            }
+            // if (driverMarker.current) {
+            //   driverMarker.current.setLngLat([longitude, latitude]);
+            // } else {
+            //   driverMarker.current = new mapboxgl.Marker({ color: "blue" })
+            //     .setLngLat([longitude, latitude])
+            //     .addTo(mapInstance.current);
+            // }
           }
         },
         (err) => console.error("Geolocation error:", err),
@@ -903,31 +1310,55 @@ export default function RideMap() {
             )}
           </div>
 
-          <div className="absolute bottom-28 w-full flex justify-center z-50">
-            {rideStatus === "in_progress" && (
-              <button onClick={() => setRideStatus("on_the_way")} className="bg-blue-600 text-white px-6 py-3 rounded-full shadow-lg font-bold">
-                Start Ride
-              </button>
-            )}
+       {/* Ride action buttons based on current rideStatus */}
+{rideStatus === "accepted" && (
+  <button
+    onClick={handleStartToPickup}
+    className="bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-700 transition"
+  >
+    Start to Pickup
+  </button>
+)}
 
-            {rideStatus === "on_the_way" && !isPaused && (
-              <button onClick={() => setIsPaused(true)} className="bg-yellow-600 text-white px-6 py-3 rounded-full shadow-lg font-bold">
-                Stop Ride
-              </button>
-            )}
+{rideStatus === "in_progress" && (
+  <button
+    onClick={handlePickupToMidway}
+    className="bg-green-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-green-700 transition"
+  >
+    Go to Midway
+  </button>
+)}
 
-            {isPaused && (
-              <button onClick={() => setIsPaused(false)} className="bg-green-600 text-white px-6 py-3 rounded-full shadow-lg font-bold">
-                Resume Ride
-              </button>
-            )}
+{rideStatus === "at_stop" && (
+  <button
+    onClick={handleMidwayToDropoff}
+    className="bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-800 transition"
+  >
+    Go to Dropoff
+  </button>
+)}
 
-            {rideStatus === "completed" && (
-              <button className="bg-gray-700 text-white px-6 py-3 rounded-full shadow-lg font-bold" disabled>
-                Ride Completed
-              </button>
-            )}
-          </div>
+{/* When ride reaches dropoff, show Finish button */}
+{rideStatus === "completed" && !rideFinished && (
+  <button
+    onClick={() => {
+      handleFinishRide();
+      setRideFinished(true); // set local state to hide all buttons
+    }}
+    className="bg-purple-700 text-white px-6 py-3 rounded-xl font-semibold hover:bg-purple-800 transition"
+  >
+    Finish Ride
+  </button>
+)}
+
+{/* When ride is finished, show success text */}
+{rideStatus === "completed" && rideFinished && (
+  <p className="text-lg font-semibold text-green-600">
+    ✅ Ride Completed Successfully
+  </p>
+)}
+
+
 
           <button onClick={handleChatWithCustomer} className={`p-2 rounded-full text-2xl ${isDarkMode ? "text-white" : "text-gray-900"}`} title="Chat with customer">
             <FaComments />
