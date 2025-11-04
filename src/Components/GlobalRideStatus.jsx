@@ -1,22 +1,25 @@
 import { useActiveRide } from '../contexts/ActiveRideContext';
 import { FaCar, FaMapMarkerAlt, FaChevronRight } from 'react-icons/fa';
+import useAuth from './useAuth';
 
 const GlobalRideStatus = () => {
+  const { user } = useAuth();
   const { isActive, activeRide } = useActiveRide();
-   console.log(activeRide)
-  const shouldShow =
-    isActive &&
-    activeRide &&
-    ["accepted", "on_the_way", "in_progress"].includes(activeRide.status);
 
-  if (!shouldShow) return null;
+  // 🚫 Hide if no user or ride doesn’t belong to this driver
+  if (
+    !user || 
+    !isActive || 
+    !activeRide || 
+    activeRide.driverId !== user._id || 
+    !["accepted", "on_the_way", "in_progress"].includes(activeRide.status)
+  ) {
+    return null;
+  }
 
-  // (only the relevant part)
-const handleClick = () => {
+  const handleClick = () => {
     if (activeRide && activeRide._id) {
-      // full page load fallback (works even outside Router)
       window.location.href = `/ride/${activeRide._id}`;
-      // or: window.location.assign(`/ride/${activeRide._id}`);
     }
   };
 
@@ -33,22 +36,20 @@ const handleClick = () => {
     }
   };
 
-  // fallback values
   const etaText = activeRide?.eta ? `${activeRide.eta} min` : '';
   const distanceText = activeRide?.distance ? `${activeRide.distance}` : '';
 
   return (
     <>
-      {/* Desktop / large screens */}
+      {/* Desktop */}
       <button
         onClick={handleClick}
         aria-label="Open active ride"
-        className="hidden global-ride-status sm:flex fixed bottom-12 left-4 z-[9999] items-center gap-3
+        className="hidden sm:flex fixed bottom-12 left-4 z-[9999] items-center gap-3
                    bg-gradient-to-r from-green-500 to-green-600 text-white
                    px-4 py-3 rounded-2xl shadow-2xl transform transition-transform
                    hover:scale-105 focus:scale-105 focus:outline-none cursor-pointer"
       >
-        {/* Animated pulse / vehicle */}
         <div className="relative flex items-center justify-center w-10 h-10">
           <div className="absolute w-10 h-10 rounded-full bg-white/20 animate-ping"></div>
           <div className="z-10 w-9 h-9 rounded-full bg-white/10 flex items-center justify-center">
@@ -56,7 +57,6 @@ const handleClick = () => {
           </div>
         </div>
 
-        {/* Text content */}
         <div className="flex flex-col text-left">
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold tracking-wide">{getStatusText()}</span>
@@ -72,16 +72,14 @@ const handleClick = () => {
           </div>
 
           <div className="text-[13px] opacity-90 mt-1 flex items-center gap-3">
-            {activeRide?.riderName ? (
-              <span className="font-medium">{activeRide.riderName}</span>
-            ) : null}
-            {distanceText ? (
+            {activeRide?.riderName && <span className="font-medium">{activeRide.riderName}</span>}
+            {distanceText && (
               <span className="flex items-center gap-1 text-xs opacity-90">
                 <FaMapMarkerAlt className="text-white/90" />
                 {distanceText}
               </span>
-            ) : null}
-            {etaText ? <span className="text-xs opacity-90">• {etaText}</span> : null}
+            )}
+            {etaText && <span className="text-xs opacity-90">• {etaText}</span>}
           </div>
         </div>
 
@@ -94,7 +92,7 @@ const handleClick = () => {
       <button
         onClick={handleClick}
         aria-label="Open active ride"
-        className="sm:hidden global-ride-status fixed top-3 left-3 z-[9999] flex items-center gap-2
+        className="sm:hidden fixed top-3 left-3 z-[9999] flex items-center gap-2
                    bg-gradient-to-r from-green-500 to-green-600 text-white
                    px-3 py-2 rounded-xl shadow-lg transform transition-transform
                    hover:scale-105 focus:scale-105 focus:outline-none cursor-pointer"
