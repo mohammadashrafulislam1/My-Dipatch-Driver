@@ -1073,146 +1073,146 @@ if (driverLocation && rideData?.pickup) {
     }
   };
 
-  // Start navigation do not need it anymore
-  const handleStartJourney = useCallback(async () => {
-    if (!routePath.length || journeyActiveRef.current || !rideData) return;
+  // Start navigation do not need it anymore must be deleted
+  // const handleStartJourney = useCallback(async () => {
+  //   if (!routePath.length || journeyActiveRef.current || !rideData) return;
 
-    setJourneyStarted(true);
-    journeyActiveRef.current = true;
+  //   setJourneyStarted(true);
+  //   journeyActiveRef.current = true;
 
-    setIsActive(true); // Set global active state
+  //   setIsActive(true); // Set global active state
 
-    // Update ride status locally and in global context
-    const updatedRide = {
-      ...rideData,
-      status: "in_progress", // Changed from "on_the_way" to "in_progress"
-      type: "active_ride"
-    };
+  //   // Update ride status locally and in global context
+  //   const updatedRide = {
+  //     ...rideData,
+  //     status: "in_progress", // Changed from "on_the_way" to "in_progress"
+  //     type: "active_ride"
+  //   };
 
-    startRide(updatedRide);
+  //   startRide(updatedRide);
 
-    // 🔥 OPTIONAL: Update ride status in backend as well
-    try {
-      const response = await fetch(`${endPoint}/rides/status/${rideData._id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ status: 'in_progress' })
-      });
+  //   // 🔥 OPTIONAL: Update ride status in backend as well
+  //   try {
+  //     const response = await fetch(`${endPoint}/rides/status/${rideData._id}`, {
+  //       method: 'PUT',
+  //       headers: {
+  //         'Content-Type': 'application/json',
+  //       },
+  //       body: JSON.stringify({ status: 'in_progress' })
+  //     });
       
-      if (response.ok) {
-        console.log('✅ Ride status updated to in_progress in backend');
-      } else {
-        console.warn('⚠️ Failed to update ride status in backend');
-      }
-    } catch (error) {
-      console.error('❌ Error updating ride status:', error);
-    }
+  //     if (response.ok) {
+  //       console.log('✅ Ride status updated to in_progress in backend');
+  //     } else {
+  //       console.warn('⚠️ Failed to update ride status in backend');
+  //     }
+  //   } catch (error) {
+  //     console.error('❌ Error updating ride status:', error);
+  //   }
 
-    const line = turf.lineString(routePath);
-    const routeLength = turf.length(line, { units: "kilometers" });
+  //   const line = turf.lineString(routePath);
+  //   const routeLength = turf.length(line, { units: "kilometers" });
 
-    let traveled = 0;
-    const speed = 0.003;
+  //   let traveled = 0;
+  //   const speed = 0.003;
 
-    const animate = () => {
-      if (traveled >= routeLength) {
-        setCurrentStep(instructions.length);
-        setRemaining({ distance: 0, duration: 0 });
-        setJourneyStarted(false);
-        journeyActiveRef.current = false;
-        return;
-      }
+  //   const animate = () => {
+  //     if (traveled >= routeLength) {
+  //       setCurrentStep(instructions.length);
+  //       setRemaining({ distance: 0, duration: 0 });
+  //       setJourneyStarted(false);
+  //       journeyActiveRef.current = false;
+  //       return;
+  //     }
 
-      const currentPoint = turf.along(line, traveled, { units: "kilometers" });
-      const nextPoint = turf.along(line, traveled + 0.01, { units: "kilometers" });
+  //     const currentPoint = turf.along(line, traveled, { units: "kilometers" });
+  //     const nextPoint = turf.along(line, traveled + 0.01, { units: "kilometers" });
 
-      const coords = currentPoint.geometry.coordinates;
-      const heading = turf.bearing(
-        turf.point(coords),
-        turf.point(nextPoint.geometry.coordinates)
-      );
+  //     const coords = currentPoint.geometry.coordinates;
+  //     const heading = turf.bearing(
+  //       turf.point(coords),
+  //       turf.point(nextPoint.geometry.coordinates)
+  //     );
 
-      // Update driver marker
-      const driverSource = mapInstance.current.getSource("driver");
-      if (driverSource) {
-        driverSource.setData({
-          type: "FeatureCollection",
-          features: [
-            {
-              type: "Feature",
-              geometry: { type: "Point", coordinates: coords },
-              properties: { bearing: heading },
-            },
-          ],
-        });
-      }
+  //     // Update driver marker
+  //     const driverSource = mapInstance.current.getSource("driver");
+  //     if (driverSource) {
+  //       driverSource.setData({
+  //         type: "FeatureCollection",
+  //         features: [
+  //           {
+  //             type: "Feature",
+  //             geometry: { type: "Point", coordinates: coords },
+  //             properties: { bearing: heading },
+  //           },
+  //         ],
+  //       });
+  //     }
 
-      // Emit live driver location to backend
-      if (socketRef.current && user?._id && rideData?._id) {
-        socketRef.current.emit("driver-location-update", {
-          driverId: user._id,
-          rideId: rideData._id,
-          customerId: rideData?.customerId,
-          location: {
-            lat: coords[1],
-            lng: coords[0],
-            bearing: heading,
-          },
-        });
-      }
+  //     // Emit live driver location to backend
+  //     if (socketRef.current && user?._id && rideData?._id) {
+  //       socketRef.current.emit("driver-location-update", {
+  //         driverId: user._id,
+  //         rideId: rideData._id,
+  //         customerId: rideData?.customerId,
+  //         location: {
+  //           lat: coords[1],
+  //           lng: coords[0],
+  //           bearing: heading,
+  //         },
+  //       });
+  //     }
 
-      // Update camera
-      mapInstance.current.easeTo({
-        center: coords,
-        zoom: 17,
-        pitch: 65,
-        bearing: heading,
-        duration: 100,
-        easing: (t) => t,
-      });
+  //     // Update camera
+  //     mapInstance.current.easeTo({
+  //       center: coords,
+  //       zoom: 17,
+  //       pitch: 65,
+  //       bearing: heading,
+  //       duration: 100,
+  //       easing: (t) => t,
+  //     });
 
-      // --- Sync step with marker ---
-      const snapped = turf.nearestPointOnLine(line, currentPoint, { units: "kilometers" });
-      const traveledSoFar = snapped.properties.location; // total km along route
+  //     // --- Sync step with marker ---
+  //     const snapped = turf.nearestPointOnLine(line, currentPoint, { units: "kilometers" });
+  //     const traveledSoFar = snapped.properties.location; // total km along route
 
-      let currentStepIndex = 0;
-      let cumulative = 0;
-      let remainingDistance = 0;
+  //     let currentStepIndex = 0;
+  //     let cumulative = 0;
+  //     let remainingDistance = 0;
 
-      for (let i = 0; i < stepSegments.length; i++) {
-        const segment = stepSegments[i];
-        const segmentLine = turf.lineString(
-          routePath.slice(segment.startIndex, segment.endIndex + 1)
-        );
-        const segLength = turf.length(segmentLine, { units: "kilometers" });
+  //     for (let i = 0; i < stepSegments.length; i++) {
+  //       const segment = stepSegments[i];
+  //       const segmentLine = turf.lineString(
+  //         routePath.slice(segment.startIndex, segment.endIndex + 1)
+  //       );
+  //       const segLength = turf.length(segmentLine, { units: "kilometers" });
 
-        if (traveledSoFar >= cumulative && traveledSoFar <= cumulative + segLength) {
-          currentStepIndex = i;
-          remainingDistance = cumulative + segLength - traveledSoFar;
-          break;
-        }
-        cumulative += segLength;
-      }
+  //       if (traveledSoFar >= cumulative && traveledSoFar <= cumulative + segLength) {
+  //         currentStepIndex = i;
+  //         remainingDistance = cumulative + segLength - traveledSoFar;
+  //         break;
+  //       }
+  //       cumulative += segLength;
+  //     }
 
-      // Update UI state
-      setCurrentStep(currentStepIndex);
-      setRemaining({
-        distance: remainingDistance * 1000, // meters
-        duration: (remainingDistance / 0.06) * 60, // minutes at 60 km/h
-      });
+  //     // Update UI state
+  //     setCurrentStep(currentStepIndex);
+  //     setRemaining({
+  //       distance: remainingDistance * 1000, // meters
+  //       duration: (remainingDistance / 0.06) * 60, // minutes at 60 km/h
+  //     });
 
-      // Advance along route
-      traveled += speed;
+  //     // Advance along route
+  //     traveled += speed;
 
-      if (journeyActiveRef.current) {
-        requestAnimationFrame(animate);
-      }
-    };
+  //     if (journeyActiveRef.current) {
+  //       requestAnimationFrame(animate);
+  //     }
+  //   };
 
-    animate();
-  }, [routePath, instructions, stepSegments, startRide, setIsActive, rideData, updateRideStatus, user?._id]);
+  //   animate();
+  // }, [routePath, instructions, stepSegments, startRide, setIsActive, rideData, updateRideStatus, user?._id]);
 
   useEffect(() => {
     return () => {
@@ -1357,12 +1357,7 @@ if (driverLocation && rideData?.pickup) {
       </div>
 
       {/* BOTTOM NAVIGATION BAR (MATCHING DESIGN) */}
-      <div className={`absolute flex gap-24 flex-row-reverse bottom-0 w-full shadow-2xl z-10 px-10`}>
-        {!journeyStarted && routePath.length > 0 && (
-          <button onClick={handleStartJourney} className="text-center flex items-center justify-center mb-4 bg-gray-900 text-white w-28 h-24 rounded-full shadow-lg hover:bg-black font-bold">
-            <img src="https://i.ibb.co/Psm5vrxs/Gemini-Generated-Image-aaev1maaev1maaev-removebg-preview.png" alt="" className=" w-28" />
-          </button>
-        )}
+      <div className={`absolute flex gap-24 flex-row-reverse bottom-0 w-full shadow-2xl z-10 md:px-10 px-3`}>
 
         <div className={`flex items-center w-full p-5 rounded-xl justify-between h-full ${isDarkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-900"}`}>
           <button className={`p-2 rounded-full text-2xl ${isDarkMode ? "text-white" : "text-gray-900"}`}>⋮</button>
@@ -1385,7 +1380,7 @@ if (driverLocation && rideData?.pickup) {
 {rideStatus === "accepted" && (
   <button
     onClick={handleStartToPickup}
-    className="bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-700 transition"
+    className="bg-blue-600 text-white md:px-6 md:py-3 px-3 text-[12px] md:text-xl py-2  rounded-xl font-semibold hover:bg-blue-700 transition"
   >
     Start to Pickup
   </button>
@@ -1394,7 +1389,7 @@ if (driverLocation && rideData?.pickup) {
 {rideStatus === "in_progress" && (
   <button
     onClick={handlePickupToMidway}
-    className="bg-green-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-green-700 transition"
+    className="bg-green-600 text-white md:px-6 md:py-3 px-3 text-[12px] md:text-xl py-2  rounded-xl font-semibold hover:bg-green-700 transition"
   >
     Go to Midway
   </button>
@@ -1403,7 +1398,7 @@ if (driverLocation && rideData?.pickup) {
 {rideStatus === "at_stop" && (
   <button
     onClick={handleMidwayToDropoff}
-    className="bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-800 transition"
+    className="bg-blue-700 text-white md:px-6 md:py-3 px-3 text-[12px] md:text-xl py-2  rounded-xl font-semibold hover:bg-blue-800 transition"
   >
     Go to Dropoff
   </button>
@@ -1416,7 +1411,7 @@ if (driverLocation && rideData?.pickup) {
       handleFinishRide();
       setRideFinished(true); // set local state to hide all buttons
     }}
-    className="bg-purple-700 text-white px-6 py-3 rounded-xl font-semibold hover:bg-purple-800 transition"
+    className="bg-purple-700 text-white md:px-6 md:py-3 px-3 text-[12px] md:text-xl py-2  rounded-xl font-semibold hover:bg-purple-800 transition"
   >
     Finish Ride
   </button>
