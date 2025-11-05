@@ -68,6 +68,7 @@ export default function RideMap() {
   const [rideStatus, setRideStatus] = useState("accepted");
   const [isPaused, setIsPaused] = useState(false);
   const [rideFinished, setRideFinished] = useState(false);
+const [followDriver, setFollowDriver] = useState(false);
 
   // Add driverMarker ref definition
   const driverMarker = useRef(null);
@@ -194,10 +195,12 @@ export default function RideMap() {
     if (rideStatus === "in_progress" && pickupDist < 50) {
       // Show Start Ride button or auto-trigger next step
       console.log("Arrived at pickup location");
+    setFollowDriver(false); // ✅ stop camera follow
     }
 
     if (rideStatus === "on_the_way" && dropoffDist < 50) {
       setRideStatus("completed");
+    setFollowDriver(false); // ✅ stop camera follow
       // Optionally: send to backend
       console.log("Arrived at dropoff location");
     }
@@ -243,7 +246,7 @@ const handleStartToPickup = useCallback(async () => {
 
   setRideStatus("in_progress");
   setJourneyStarted(true);
-
+  setFollowDriver(true); // ✅ enable camera follow
         await updateRideStat(rideData._id, "in_progress");
 updateRideStatus("in_progress"); // ✅ Sync context
 
@@ -281,60 +284,6 @@ updateRideStatus("in_progress"); // ✅ Sync context
   setInstructions(stepsData);
   setCurrentStep(0);
 
-  let traveled = 0;
-  const speed = 0.003;
-
-  const animate = () => {
-    if (traveled >= totalDistance) {
-      console.log("✅ Arrived at pickup");
-      setJourneyStarted(false);
-      return;
-    }
-
-    const currentPoint = turf.along(line, traveled, { units: "kilometers" });
-    const nextPoint = turf.along(line, traveled + 0.01, { units: "kilometers" });
-    const coords = currentPoint.geometry.coordinates;
-    const heading = turf.bearing(turf.point(coords), turf.point(nextPoint.geometry.coordinates));
-
-    // Move driver marker
-    const driverSource = mapInstance.current.getSource("driver");
-    if (driverSource) {
-      driverSource.setData({
-        type: "FeatureCollection",
-        features: [{ type: "Feature", geometry: { type: "Point", coordinates: coords }, properties: { bearing: heading } }],
-      });
-    }
-
-    // Follow camera
-    mapInstance.current.easeTo({
-      center: coords,
-      zoom: 17,
-      pitch: 65,
-      bearing: heading,
-      duration: 100,
-    });
-
-    // 🔄 Update step based on distance
-    let cumulative = 0;
-    for (let i = 0; i < stepsData.length; i++) {
-      const stepLine = turf.lineString(stepsData[i].coords);
-      const stepLength = turf.length(stepLine, { units: "kilometers" });
-      if (traveled <= cumulative + stepLength) {
-        setCurrentStep(i);
-        setRemaining({
-          distance: (totalDistance - traveled) * 1000,
-          duration: ((totalDistance - traveled) / 0.06) * 60,
-        });
-        break;
-      }
-      cumulative += stepLength;
-    }
-
-    traveled += speed;
-    requestAnimationFrame(animate);
-  };
-
-  animate();
 }, [driverLocation, rideData]);
 
 
@@ -348,6 +297,7 @@ const handlePickupToMidway = useCallback(async () => {
 
   setRideStatus("on_the_way");
   setJourneyStarted(true); // ✅ Show instruction box
+  setFollowDriver(true); // ✅ enable camera follow
 
         await updateRideStat(rideData._id, "on_the_way");
 updateRideStatus("on_the_way"); // ✅ Sync context
@@ -387,88 +337,6 @@ updateRideStatus("on_the_way"); // ✅ Sync context
   setInstructions(stepsData);
   setCurrentStep(0);
 
-  let traveled = 0;
-  const speed = 0.003; // km per frame approx
-
-  const animate = async () => {
-    // 🏁 ARRIVAL DETECTION (with margin)
-    if (traveled >= totalDistance - 0.005) {
-      console.log("🛑 Arrived at midway stop");
-
-      // Stop navigation visuals
-      setJourneyStarted(false);
-      setRideStatus("at_stop");
-
-      // ✅ Await backend update (avoid premature exit)
-      try {
-        await updateRideStat(rideData._id, "at_stop");
-updateRideStatus("at_stop"); // ✅ Sync context
-      } catch (err) {
-        console.error("❌ Failed to update backend status:", err);
-      }
-
-      return;
-    }
-
-    const currentPoint = turf.along(line, traveled, { units: "kilometers" });
-    const nextPoint = turf.along(line, traveled + 0.01, { units: "kilometers" });
-    const coords = currentPoint.geometry.coordinates;
-    const heading = turf.bearing(turf.point(coords), turf.point(nextPoint.geometry.coordinates));
-
-    // 🧭 Update driver marker
-    const driverSource = mapInstance.current.getSource("driver");
-    if (driverSource) {
-      driverSource.setData({
-        type: "FeatureCollection",
-        features: [
-          {
-            type: "Feature",
-            geometry: { type: "Point", coordinates: coords },
-            properties: { bearing: heading },
-          },
-        ],
-      });
-    }
-
-    // 🎥 Camera follow
-    mapInstance.current.easeTo({
-      center: coords,
-      zoom: 17,
-      pitch: 65,
-      bearing: heading,
-      duration: 100,
-    });
-
-    // 📡 Emit live driver location
-    socketRef.current?.emit("driver-location-update", {
-      driverId: user._id,
-      rideId: rideData._id,
-      customerId: rideData.customerId,
-      location: { lat: coords[1], lng: coords[0], bearing: heading },
-    });
-
-    // 🔄 Update turn instructions dynamically
-    let cumulative = 0;
-    for (let i = 0; i < stepsData.length; i++) {
-      const stepLine = turf.lineString(stepsData[i].coords);
-      const stepLength = turf.length(stepLine, { units: "kilometers" });
-      if (traveled <= cumulative + stepLength) {
-        setCurrentStep(i);
-        setRemaining({
-          distance: (totalDistance - traveled) * 1000,
-          duration: ((totalDistance - traveled) / 0.06) * 60, // ≈60 km/h
-        });
-        break;
-      }
-      cumulative += stepLength;
-    }
-
-    // 🚗 Move forward
-    traveled += speed;
-    requestAnimationFrame(animate);
-  };
-
-  animate();
 }, [rideData, mapInstance, user]);
 
 
@@ -494,6 +362,7 @@ const handleMidwayToDropoff = useCallback(async () => {
 
   setRideStatus("on_the_way");
   setJourneyStarted(true); // ✅ Show instructions panel
+  setFollowDriver(true); // ✅ enable camera follow
 
  
         await updateRideStat(rideData._id, "on_the_way");
@@ -534,80 +403,7 @@ updateRideStatus("on_the_way"); // ✅ Sync context
   setInstructions(stepsData);
   setCurrentStep(0);
 
-  let traveled = 0;
-  const speed = 0.003;
 
-  const animate = () => {
-    if (traveled >= totalDistance) {
-      console.log("🏁 Arrived at dropoff — waiting for Finish Ride click");
-      
-      setRideStatus("completed");
-      setJourneyStarted(false); // ✅ Hide instructions when done
-      return;
-    }
-
-    const currentPoint = turf.along(line, traveled, { units: "kilometers" });
-    const nextPoint = turf.along(line, traveled + 0.01, { units: "kilometers" });
-    const coords = currentPoint.geometry.coordinates;
-    const heading = turf.bearing(
-      turf.point(coords),
-      turf.point(nextPoint.geometry.coordinates)
-    );
-
-    // 🧭 Update driver marker
-    const driverSource = mapInstance.current.getSource("driver");
-    if (driverSource) {
-      driverSource.setData({
-        type: "FeatureCollection",
-        features: [
-          {
-            type: "Feature",
-            geometry: { type: "Point", coordinates: coords },
-            properties: { bearing: heading },
-          },
-        ],
-      });
-    }
-
-    // 🎥 Smooth camera follow
-    mapInstance.current.easeTo({
-      center: coords,
-      zoom: 17,
-      pitch: 65,
-      bearing: heading,
-      duration: 100,
-      easing: (t) => t,
-    });
-
-    // 📡 Emit driver location
-    socketRef.current?.emit("driver-location-update", {
-      driverId: user._id,
-      rideId: rideData._id,
-      customerId: rideData.customerId,
-      location: { lat: coords[1], lng: coords[0], bearing: heading },
-    });
-
-    // 🔄 Update current step dynamically
-    let cumulative = 0;
-    for (let i = 0; i < stepsData.length; i++) {
-      const stepLine = turf.lineString(stepsData[i].coords);
-      const stepLength = turf.length(stepLine, { units: "kilometers" });
-      if (traveled <= cumulative + stepLength) {
-        setCurrentStep(i);
-        setRemaining({
-          distance: (totalDistance - traveled) * 1000,
-          duration: ((totalDistance - traveled) / 0.06) * 60, // ~60 km/h
-        });
-        break;
-      }
-      cumulative += stepLength;
-    }
-
-    traveled += speed;
-    requestAnimationFrame(animate);
-  };
-
-  animate();
 }, [rideData, mapInstance, user]);
 
 
@@ -1027,31 +823,96 @@ if (driverLocation && rideData?.pickup) {
     };
   }, [mapLoaded, fetchDirections, rideData]);
 
-  // Geolocation effect - FIXED: Check if mapInstance exists
-  useEffect(() => {
-    if (navigator.geolocation) {
-      const watchId = navigator.geolocation.watchPosition(
-        (pos) => {
-          const { latitude, longitude } = pos.coords;
-          setDriverLocation([longitude, latitude]);
+// 🛰️ LIVE GPS TRACKING (auto arrow movement + camera follow)
+useEffect(() => {
+  if (!mapInstance.current) return;
 
-          if (mapInstance.current) {
-            // Update marker
-            // if (driverMarker.current) {
-            //   driverMarker.current.setLngLat([longitude, latitude]);
-            // } else {
-            //   driverMarker.current = new mapboxgl.Marker({ color: "blue" })
-            //     .setLngLat([longitude, latitude])
-            //     .addTo(mapInstance.current);
-            // }
-          }
+  const map = mapInstance.current;
+
+  const watchId = navigator.geolocation.watchPosition(
+    (pos) => {
+      const { latitude, longitude, heading, speed, accuracy } = pos.coords;
+      const newCoords = [longitude, latitude];
+      setDriverLocation(newCoords);
+
+      if (accuracy > 50) console.warn("GPS accuracy low:", Math.round(accuracy));
+
+      const driverSource = map.getSource("driver");
+      if (driverSource) {
+        driverSource.setData({
+          type: "FeatureCollection",
+          features: [
+            {
+              type: "Feature",
+              geometry: { type: "Point", coordinates: newCoords },
+              properties: { bearing: heading || 0 },
+            },
+          ],
+        });
+      } else {
+        map.addSource("driver", {
+          type: "geojson",
+          data: {
+            type: "FeatureCollection",
+            features: [
+              {
+                type: "Feature",
+                geometry: { type: "Point", coordinates: newCoords },
+                properties: { bearing: heading || 0 },
+              },
+            ],
+          },
+        });
+
+        map.addLayer({
+          id: "driver-layer",
+          type: "symbol",
+          source: "driver",
+          layout: {
+            "icon-image": "arrow-icon",
+            "icon-size": 0.3,
+            "icon-rotate": ["get", "bearing"],
+            "icon-rotation-alignment": "map",
+            "icon-allow-overlap": true,
+          },
+        });
+      }
+
+      // Smooth camera follow
+     if (followDriver) {
+  map.easeTo({
+    center: newCoords,
+    bearing: heading || 0,
+    pitch: 65,
+    zoom: 17,
+    duration: 1000,
+    easing: (t) => t * (2 - t),
+  });
+}
+
+
+      // Send to backend if needed
+      socketRef.current?.emit("driver-location-update", {
+        driverId: user._id,
+        rideId: rideData?._id,
+        customerId: rideData?.customerId,
+        location: {
+          lat: latitude,
+          lng: longitude,
+          speed,
+          heading: heading || 0,
         },
-        (err) => console.error("Geolocation error:", err),
-        { enableHighAccuracy: true }
-      );
-      return () => navigator.geolocation.clearWatch(watchId);
-    }
-  }, []);
+      });
+    },
+    (err) => console.error("Geolocation error:", err),
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+  );
+
+  return () => navigator.geolocation.clearWatch(watchId);
+}, [mapInstance.current, rideData, user?._id]);
+
+
+
 
   // Distance calculation function
   const getDistance = (loc1, loc2) => {
@@ -1325,7 +1186,6 @@ if (driverLocation && rideData?.pickup) {
         <button
           onClick={() => {
             setIsDarkMode(!isDarkMode);
-            window.location.reload();
           }}
           className={`p-3 text-2xl rounded-xl shadow-lg ${isDarkMode ? "bg-gray-700 text-white" : "bg-white text-gray-900"}`}
         >
