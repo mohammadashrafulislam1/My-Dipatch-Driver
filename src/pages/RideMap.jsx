@@ -122,55 +122,57 @@ const [followDriver, setFollowDriver] = useState(false);
     return turf.bearing(turf.point(start), turf.point(end));
   }, []);
 
-  // Resolve rideData when component mounts or when relevant sources change
-  useEffect(() => {
-    let mounted = true;
+// Resolve rideData when component mounts or when relevant sources change
+useEffect(() => {
+  let mounted = true;
 
-    const resolveRide = async () => {
-      // 1) If location.state is present use that
-      if (location.state) {
-        if (mounted) setRideData(location.state);
-        return;
-      }
+  const resolveRide = async () => {
+    // If we already have rideData, don't resolve again
+    if (rideData) return;
 
-      const id = params.id;
+    // 1) If location.state is present use that
+    if (location.state) {
+      if (mounted) setRideData(location.state);
+      return;
+    }
 
-      // 2) If there's a globalActiveRide that matches the param id, use that
-      if (globalActiveRide && id && globalActiveRide._id === id) {
-        if (mounted) setRideData(globalActiveRide);
-        return;
-      }
+    const id = params.id;
 
-      // 3) Try reading from localStorage (persisted by ActiveRideContext)
-      try {
-        const saved = localStorage.getItem('activeRide');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (parsed && parsed._id === id) {
-            if (mounted) setRideData(parsed);
-            return;
-          }
-        }
-      } catch (e) {
-        console.warn('Failed to parse activeRide from localStorage', e);
-      }
+    // 2) If there's a globalActiveRide that matches the param id, use that
+    if (globalActiveRide && id && globalActiveRide._id === id) {
+      if (mounted) setRideData(globalActiveRide);
+      return;
+    }
 
-      // 4) As a last resort fetch the ride from server by id
-      if (id) {
-        const fetched = await fetchRideById(id);
-        if (fetched && mounted) {
-          setRideData(fetched);
-          // Optionally: startRide(fetched);
+    // 3) Try reading from localStorage (persisted by ActiveRideContext)
+    try {
+      const saved = localStorage.getItem('activeRide');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed._id === id) {
+          if (mounted) setRideData(parsed);
+          return;
         }
       }
-    };
+    } catch (e) {
+      console.warn('Failed to parse activeRide from localStorage', e);
+    }
 
-    resolveRide();
+    // 4) As a last resort fetch the ride from server by id
+    if (id) {
+      const fetched = await fetchRideById(id);
+      if (fetched && mounted) {
+        setRideData(fetched);
+      }
+    }
+  };
 
-    return () => {
-      mounted = false;
-    };
-  }, [location.state, params.id, globalActiveRide, startRide]);
+  resolveRide();
+
+  return () => {
+    mounted = false;
+  };
+}, [location.state, params.id, globalActiveRide, rideData]); // Added rideData to dependencies
 
   // Update fetch customer when rideData changes
   useEffect(() => {
@@ -713,70 +715,70 @@ if (driverLocation && rideData?.pickup) {
       });
   }, [rideData, isDarkMode, driverLocation]);
 
-  // Init map (Phase 1: Map Instance Creation) - FIXED: Check if rideData exists
-  useEffect(() => {
-    if (!mapRef.current || mapInstance.current) return;
-    if (!rideData?.pickup) return; // need rideData to set center
+ // Init map (Phase 1: Map Instance Creation) - FIXED: Check if rideData exists
+useEffect(() => {
+  if (!mapRef.current || mapInstance.current) return;
+  if (!rideData?.pickup) return; // need rideData to set center
 
-    const mapStyle = isDarkMode
-      ? "mapbox://styles/mapbox/navigation-night-v1"
-      : "mapbox://styles/mapbox/navigation-day-v1";
+  const mapStyle = isDarkMode
+    ? "mapbox://styles/mapbox/navigation-night-v1"
+    : "mapbox://styles/mapbox/navigation-day-v1";
 
-    mapInstance.current = new mapboxgl.Map({
-      container: mapRef.current,
-      style: mapStyle,
-      center: [rideData.pickup.lng, rideData.pickup.lat],
-      zoom: 14,
-      pitch: 0,
-      bearing: 0,
-    });
+  mapInstance.current = new mapboxgl.Map({
+    container: mapRef.current,
+    style: mapStyle,
+    center: [rideData.pickup.lng, rideData.pickup.lat],
+    zoom: 14,
+    pitch: 0,
+    bearing: 0,
+  });
 
-    mapInstance.current.addControl(new mapboxgl.NavigationControl(), "top-right");
+  mapInstance.current.addControl(new mapboxgl.NavigationControl(), "top-right");
 
-    mapInstance.current.on("load", () => {
-      setMapLoaded(true);
+  mapInstance.current.on("load", () => {
+    setMapLoaded(true);
 
-      // --- Load driver arrow ---
-      mapInstance.current.loadImage(
-        "https://i.ibb.co/Psm5vrxs/Gemini-Generated-Image-aaev1maaev1maaev-removebg-preview.png",
-        (error, image) => {
-          if (error) throw error;
-          if (!mapInstance.current.hasImage("arrow-icon")) {
-            mapInstance.current.addImage("arrow-icon", image);
-          }
+    // --- Load driver arrow ---
+    mapInstance.current.loadImage(
+      "https://i.ibb.co/Psm5vrxs/Gemini-Generated-Image-aaev1maaev1maaev-removebg-preview.png",
+      (error, image) => {
+        if (error) throw error;
+        if (!mapInstance.current.hasImage("arrow-icon")) {
+          mapInstance.current.addImage("arrow-icon", image);
         }
-      );
-
-      // --- Load midway stop icon ---
-      mapInstance.current.loadImage(
-        "https://i.ibb.co/N6c33bGK/349750.png",
-        (error, image) => {
-          if (error) throw error;
-          if (!mapInstance.current.hasImage("midway-icon")) {
-            mapInstance.current.addImage("midway-icon", image);
-          }
-        }
-      );
-
-      // --- Load drop-off icon ---
-      mapInstance.current.loadImage(
-        "https://i.ibb.co/MxJckn1b/location-icon-png-4240.png",
-        (error, image) => {
-          if (error) throw error;
-          if (!mapInstance.current.hasImage("dropoff-icon")) {
-            mapInstance.current.addImage("dropoff-icon", image);
-          }
-        }
-      );
-    });
-
-    return () => {
-      if (mapInstance.current) {
-        mapInstance.current.remove();
-        mapInstance.current = null;
       }
-    };
-  }, [rideData, isDarkMode]); // Only create map when rideData is available
+    );
+
+    // --- Load midway stop icon ---
+    mapInstance.current.loadImage(
+      "https://i.ibb.co/N6c33bGK/349750.png",
+      (error, image) => {
+        if (error) throw error;
+        if (!mapInstance.current.hasImage("midway-icon")) {
+          mapInstance.current.addImage("midway-icon", image);
+        }
+      }
+    );
+
+    // --- Load drop-off icon ---
+    mapInstance.current.loadImage(
+      "https://i.ibb.co/MxJckn1b/location-icon-png-4240.png",
+      (error, image) => {
+        if (error) throw error;
+        if (!mapInstance.current.hasImage("dropoff-icon")) {
+          mapInstance.current.addImage("dropoff-icon", image);
+        }
+      }
+    );
+  });
+
+  return () => {
+    if (mapInstance.current) {
+      mapInstance.current.remove();
+      mapInstance.current = null;
+    }
+  };
+}, [rideData?.pickup, isDarkMode]); // Only create map when rideData.pickup is available and dark mode changes
 
   // Phase 2: Add static elements and fetch route
   useEffect(() => {
