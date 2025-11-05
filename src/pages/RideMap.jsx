@@ -72,7 +72,7 @@ const [followDriver, setFollowDriver] = useState(false);
 
   // Add driverMarker ref definition
   const driverMarker = useRef(null);
-const hasFetchedRef = useRef(false);
+
   // ActiveRideContext functions and globalActiveRide
   const { startRide, endRide, setIsActive, updateRideStatus, activeRide: globalActiveRide } = useActiveRide();
 
@@ -780,8 +780,7 @@ if (driverLocation && rideData?.pickup) {
 
   // Phase 2: Add static elements and fetch route
   useEffect(() => {
-   if (!mapLoaded || !mapInstance.current || !rideData || hasFetchedRef.current) return;
-  hasFetchedRef.current = true;
+    if (!mapLoaded || !mapInstance.current || !rideData) return;
     fetchDirections();
 
     // --- Setup map event handlers
@@ -910,7 +909,7 @@ useEffect(() => {
   );
 
   return () => navigator.geolocation.clearWatch(watchId);
-}, [followDriver, user?._id]);
+}, [mapInstance.current, rideData, user?._id]);
 
 
 
