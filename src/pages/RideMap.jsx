@@ -711,7 +711,7 @@ if (driverLocation && rideData?.pickup) {
       .catch((err) => {
         console.error("Directions API error", err);
       });
-  }, [rideData, isDarkMode]);
+  }, [rideData, isDarkMode, driverLocation]);
 
   // Init map (Phase 1: Map Instance Creation) - FIXED: Check if rideData exists
   useEffect(() => {
@@ -821,7 +821,7 @@ if (driverLocation && rideData?.pickup) {
         }
       }
     };
-  }, [mapLoaded, rideData?._id]);
+  }, [mapLoaded, fetchDirections, rideData]);
 
 // 🛰️ LIVE GPS TRACKING (auto arrow movement + camera follow)
 useEffect(() => {
