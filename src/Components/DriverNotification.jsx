@@ -120,33 +120,38 @@ export default function DriverNotification({ isActive }) {
     progressRef.current = null;
   }
 
-  async function handleAccept() {
-    const ride = queue[0];
-    if (!ride?._id) return;
+ async function handleAccept() {
+  const ride = queue[0];
+  if (!ride?._id || !user?._id) return;
 
-    try {
-      const res = await axios.put(`${endPoint}/rides/status/${ride._id}`, { status: "accepted" });
+  try {
+    // ✅ Capture the response
+    const res = await axios.put(`${endPoint}/rides/status/${ride._id}`, {
+      status: "accepted",
+      driverId: user._id, // ✅ Assign the current driver
+    });
 
-      console.log("✅ Ride accepted:", res.data);
+    console.log("✅ Ride accepted:", res.data);
 
-      // Clear queue & stop notification
-      setQueue([]);
-      setIsVisible(false);
-      stopSound();
-      if (timerRef.current) clearTimeout(timerRef.current);
-      if (progressRef.current) clearInterval(progressRef.current);
-      timerRef.current = null;
-      progressRef.current = null;
+    // ✅ Clear queue & stop sound
+    setQueue([]);
+    setIsVisible(false);
+    stopSound();
+    if (timerRef.current) clearTimeout(timerRef.current);
+    if (progressRef.current) clearInterval(progressRef.current);
+    timerRef.current = null;
+    progressRef.current = null;
 
-      // Persist active ride globally so GlobalRideStatus shows across pages
-      startRide(res.data);
+    // ✅ Persist active ride globally
+    startRide(res.data);
 
-      // Navigate to live map with ride data
-      navigate(`/ride/${ride._id}`, { state: res.data });
-    } catch (err) {
-      console.error("❌ Failed to accept ride:", err);
-    }
+    // ✅ Navigate to map with ride data
+    navigate(`/ride/${ride._id}`, { state: res.data });
+  } catch (err) {
+    console.error("❌ Failed to accept ride:", err);
   }
+}
+
 
   function handleDismiss() {
     console.log("❌ Ride dismissed:", queue[0]?._id);

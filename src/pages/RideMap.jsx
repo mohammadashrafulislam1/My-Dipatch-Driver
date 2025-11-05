@@ -880,18 +880,18 @@ useEffect(() => {
         });
       }
 
-      // Smooth camera follow
-     if (followDriver) {
-  map.easeTo({
-    center: newCoords,
-    bearing: heading || 0,
-    pitch: 65,
-    zoom: 17,
-    duration: 1000,
-    easing: (t) => t * (2 - t),
-  });
-}
-
+      // Smooth camera follow - ONLY update center and bearing, preserve current zoom
+      if (followDriver) {
+        const currentZoom = map.getZoom(); // Get current zoom level
+        map.easeTo({
+          center: newCoords,
+          bearing: heading || 0,
+          pitch: 65,
+          zoom: currentZoom, // Use current zoom instead of fixed 17
+          duration: 1000,
+          easing: (t) => t * (2 - t),
+        });
+      }
 
       // Send to backend if needed
       socketRef.current?.emit("driver-location-update", {
@@ -911,10 +911,7 @@ useEffect(() => {
   );
 
   return () => navigator.geolocation.clearWatch(watchId);
-}, [mapInstance.current, rideData, user?._id]);
-
-
-
+}, [mapInstance.current, rideData, user?._id, followDriver]); // Added followDriver to dependencies
 
   // Distance calculation function
   const getDistance = (loc1, loc2) => {
