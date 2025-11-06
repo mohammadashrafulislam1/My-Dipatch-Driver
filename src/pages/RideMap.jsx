@@ -832,6 +832,9 @@ useEffect(() => {
 
   mapInstance.current.on("load", () => {
     setMapLoaded(true);
+    mapInstance.current.on("wheel", () => setFollowDriver(false));
+mapInstance.current.on("mousedown", () => setFollowDriver(false));
+mapInstance.current.on("touchstart", () => setFollowDriver(false));
 
     // --- Load driver arrow ---
     mapInstance.current.loadImage(
