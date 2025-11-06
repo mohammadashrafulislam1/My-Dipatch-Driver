@@ -1159,7 +1159,6 @@ useEffect(() => {
       {/* CAMERA CONTROLS - Bottom Right */}
       <div className="absolute bottom-32 right-4 flex flex-col space-y-2 z-20">
         <button  onClick={() => {
-    setFollowDriver(true);   // ✅ re-enable following
     centerOnDriver();        // ✅ recenter immediately
   }}  className={`p-3 text-xl rounded-xl shadow-lg ${isDarkMode ? "bg-gray-700 text-white" : "bg-white text-gray-900"}`} title="Center on driver">
           <FaCrosshairs />
