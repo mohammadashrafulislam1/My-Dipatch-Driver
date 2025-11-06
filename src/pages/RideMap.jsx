@@ -992,16 +992,16 @@ useEffect(() => {
 
       // --- Smooth camera follow ---
       if (followDriver) {
-        const currentZoom = map.getZoom();
-        map.easeTo({
-          center: newCoords,
-          bearing: heading || 0,
-          pitch: 65,
-          zoom: currentZoom,
-          duration: 1000,
-          easing: (t) => t * (2 - t),
-        });
-      }
+  map.easeTo({
+    center: newCoords,
+    bearing: heading || 0,
+    pitch: 65,
+    zoom: map.getZoom(), // ✅ live zoom value
+    duration: 1000,
+    easing: (t) => t * (2 - t),
+  });
+}
+
 
       // --- Emit to backend ---
       socketRef.current?.emit("driver-location-update", {
@@ -1059,7 +1059,7 @@ const centerOnDriver = useCallback(() => {
 
   mapInstance.current.easeTo({
     center: driverLocation,
-    zoom: currentZoom, // ✅ maintain current zoom
+    zoom: mapInstance.current.getZoom(), // ✅ live zoom
     duration: 1000,
   });
 }, [driverLocation, currentZoom]);
