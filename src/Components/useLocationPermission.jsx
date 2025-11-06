@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 export default function useLocationPermission({ setDriverLocation }) {
   const [locationEnabled, setLocationEnabled] = useState(true);
   const [showLocationModal, setShowLocationModal] = useState(false);
-  console.log(setDriverLocation)
+
   // 🔹 Ask for location permission manually (user-initiated)
   const requestLocationPermission = () => {
     if (!navigator.geolocation) {
@@ -23,9 +23,29 @@ export default function useLocationPermission({ setDriverLocation }) {
         console.error("❌ Location error:", err);
         alert("Please enable location in your browser settings.");
         setLocationEnabled(false);
+        setShowLocationModal(true);
       },
       { enableHighAccuracy: true, timeout: 10000 }
     );
+  };
+
+  // 🔹 Platform-specific help for enabling location
+  const openLocationSettings = () => {
+    const ua = navigator.userAgent;
+
+    if (/Android/i.test(ua)) {
+      alert(
+        "📱 Android:\nGo to Settings → Apps → [Your App/Browser] → Permissions → Enable Location."
+      );
+    } else if (/iPhone|iPad/i.test(ua)) {
+      alert(
+        "🍎 iPhone/iPad:\nGo to Settings → Privacy → Location Services → Enable for Safari or your browser."
+      );
+    } else {
+      alert(
+        "💻 Desktop:\nPlease enable location in your browser settings:\n\nChrome: Settings → Privacy and Security → Site Settings → Location\n\nFirefox: Settings → Privacy & Security → Permissions → Location"
+      );
+    }
   };
 
   // 🔹 Watch permission changes (works in most modern browsers)
@@ -56,7 +76,7 @@ export default function useLocationPermission({ setDriverLocation }) {
       .catch(() => {});
   }, []);
 
-  // 🔹 Handle geolocation watch errors (use this inside your watchPosition)
+  // 🔹 Handle geolocation watch errors
   const handleGeoError = (err) => {
     console.warn("Geolocation error:", err);
     if (err.code === 1 || err.code === 2 || err.code === 3) {
@@ -65,7 +85,7 @@ export default function useLocationPermission({ setDriverLocation }) {
     }
   };
 
-  // 🔹 Location Modal (reusable UI)
+  // 🔹 Modal UI
   const LocationModal = () =>
     showLocationModal ? (
       <div className="fixed inset-0 flex items-center justify-center bg-black/60 z-[9999]">
@@ -78,13 +98,21 @@ export default function useLocationPermission({ setDriverLocation }) {
             your location. This is required for route updates and real-time tracking.
           </p>
 
-          <div className="flex justify-center gap-4">
+          <div className="flex flex-col gap-3">
             <button
               onClick={requestLocationPermission}
               className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg font-semibold transition"
             >
               Enable Location
             </button>
+
+            <button
+              onClick={openLocationSettings}
+              className="bg-yellow-500 hover:bg-yellow-600 text-white px-5 py-2 rounded-lg font-semibold transition"
+            >
+              Open Settings
+            </button>
+
             <button
               onClick={() => setShowLocationModal(false)}
               className="bg-gray-300 hover:bg-gray-400 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white px-5 py-2 rounded-lg font-semibold transition"
@@ -101,6 +129,7 @@ export default function useLocationPermission({ setDriverLocation }) {
     showLocationModal,
     setShowLocationModal,
     requestLocationPermission,
+    openLocationSettings,
     handleGeoError,
     LocationModal,
   };
