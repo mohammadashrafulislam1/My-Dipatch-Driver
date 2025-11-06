@@ -10,6 +10,7 @@ import { endPoint } from "../Components/ForAPIs";
 import { useActiveRide } from "../contexts/ActiveRideContext";
 import io from "socket.io-client";
 import useAuth from "../Components/useAuth";
+import useLocationPermission from "../Components/useLocationPermission.jsx";
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 const directionsClient = mbxDirections({ accessToken: mapboxgl.accessToken });
@@ -72,6 +73,12 @@ const [followDriver, setFollowDriver] = useState(false);
 const [atPickup, setAtPickup] = useState(false);
 const [atDropoff, setAtDropoff] = useState(false);
 const [dropoffStarted, setDropoffStarted] = useState(false);
+const {
+  locationEnabled,
+  handleGeoError,
+  LocationModal,
+} = useLocationPermission({ setDriverLocation });
+
 
   // Add driverMarker ref definition
   const driverMarker = useRef(null);
@@ -937,6 +944,7 @@ useEffect(() => {
 
       if (accuracy > 50) console.warn("GPS accuracy low:", Math.round(accuracy));
 
+      // --- Update driver marker ---
       const driverSource = map.getSource("driver");
       if (driverSource) {
         driverSource.setData({
@@ -978,38 +986,33 @@ useEffect(() => {
         });
       }
 
-      // Smooth camera follow - ONLY update center and bearing, preserve current zoom
+      // --- Smooth camera follow ---
       if (followDriver) {
-        const currentZoom = map.getZoom(); // Get current zoom level
+        const currentZoom = map.getZoom();
         map.easeTo({
           center: newCoords,
           bearing: heading || 0,
           pitch: 65,
-          zoom: currentZoom, // Use current zoom instead of fixed 17
+          zoom: currentZoom,
           duration: 1000,
           easing: (t) => t * (2 - t),
         });
       }
 
-      // Send to backend if needed
+      // --- Emit to backend ---
       socketRef.current?.emit("driver-location-update", {
         driverId: user._id,
         rideId: rideData?._id,
         customerId: rideData?.customerId,
-        location: {
-          lat: latitude,
-          lng: longitude,
-          speed,
-          heading: heading || 0,
-        },
+        location: { lat: latitude, lng: longitude, speed, heading: heading || 0 },
       });
     },
-    (err) => console.error("Geolocation error:", err),
-    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    handleGeoError,
+    { enableHighAccuracy: true, timeout: 20000, maximumAge: 10000 }
   );
 
   return () => navigator.geolocation.clearWatch(watchId);
-}, [mapInstance.current, rideData, user?._id, followDriver]); // Added followDriver to dependencies
+}, [mapInstance.current, rideData, user?._id, followDriver]);
 
   // Distance calculation function
   const getDistance = (loc1, loc2) => {
@@ -1103,7 +1106,8 @@ useEffect(() => {
       <div ref={mapRef} className="w-full h-full" />
 
       {/* TOP NAVIGATION HEADER (MATCHING DESIGN) */}
-      
+      <LocationModal />
+
       {journeyStarted && currentInstruction && (
         <div className="absolute top-0 left-0 right-0 p-3 z-10 flex justify-between items-start">
           {/* Left: Instruction Box */}
