@@ -69,6 +69,9 @@ export default function RideMap() {
   const [isPaused, setIsPaused] = useState(false);
   const [rideFinished, setRideFinished] = useState(false);
 const [followDriver, setFollowDriver] = useState(false);
+const [atPickup, setAtPickup] = useState(false);
+const [atDropoff, setAtDropoff] = useState(false);
+const [dropoffStarted, setDropoffStarted] = useState(false);
 
   // Add driverMarker ref definition
   const driverMarker = useRef(null);
@@ -104,7 +107,6 @@ const [followDriver, setFollowDriver] = useState(false);
     setRideStatus("completed");
   }
 }, [rideData]);
-
 
   useEffect(() => {
     localStorage.setItem("darkMode", isDarkMode);
@@ -186,6 +188,57 @@ useEffect(() => {
       setCustomer(null);
     }
   }, [rideData]);
+// 🧭 Calculate remaining distance & duration live
+useEffect(() => {
+  if (!driverLocation || instructions.length === 0) return;
+
+  try {
+    // 🧹 Filter out invalid coords
+    const routeCoords = instructions
+      .flatMap((s) => s.coords || [])
+      .filter(
+        (c) =>
+          Array.isArray(c) &&
+          c.length === 2 &&
+          typeof c[0] === "number" &&
+          typeof c[1] === "number" &&
+          !isNaN(c[0]) &&
+          !isNaN(c[1])
+      );
+
+    if (routeCoords.length < 2) {
+      console.warn("Skipping remaining-distance calc: not enough coords");
+      return;
+    }
+
+    const routeLine = turf.lineString(routeCoords);
+    const driverPoint = turf.point(driverLocation);
+
+    // Find nearest point on route
+    const snapped = turf.nearestPointOnLine(routeLine, driverPoint, {
+      units: "meters",
+    });
+
+    const totalDistance = turf.length(routeLine, { units: "meters" });
+    const traveledDistance = snapped.properties.location * totalDistance;
+    const remainingDistance = totalDistance - traveledDistance;
+
+    // Estimate remaining duration
+    const totalDuration = instructions.reduce(
+      (sum, s) => sum + (s.duration || 0),
+      0
+    );
+    const remainingDuration =
+      totalDuration * (remainingDistance / totalDistance);
+
+    setRemaining({
+      distance: remainingDistance || 0, // meters
+      duration: remainingDuration || 0, // seconds
+    });
+  } catch (err) {
+    console.warn("Failed to compute remaining distance:", err);
+  }
+}, [driverLocation, instructions]);
 
   // Fix the pickup/dropoff reference error by moving this inside a useEffect that depends on rideData
   useEffect(() => {
@@ -194,6 +247,9 @@ useEffect(() => {
     const pickupDist = getDistance(driverLocation, [rideData.pickup.lng, rideData.pickup.lat]);
     const dropoffDist = getDistance(driverLocation, [rideData.dropoff.lng, rideData.dropoff.lat]);
 
+if (rideStatus === "on_the_way" && dropoffDist < 30 && !atDropoff) {
+  setAtDropoff(true);
+}
     if (rideStatus === "in_progress" && pickupDist < 50) {
       // Show Start Ride button or auto-trigger next step
       console.log("Arrived at pickup location");
@@ -241,6 +297,49 @@ const updateRideStat = async (id, status) => {
 };
 
 // ===== ADD THESE HANDLERS ABOVE THE RETURN =====
+// Move directly from pickup → dropoff when no midway stops
+const handlePickupToDropoff = useCallback(async () => {
+  if (!rideData?.pickup || !rideData?.dropoff) return;
+
+  const start = [rideData.pickup.lng, rideData.pickup.lat];
+  const end = [rideData.dropoff.lng, rideData.dropoff.lat];
+
+  setRideStatus("on_the_way");
+  setJourneyStarted(true);
+  setFollowDriver(true);
+
+  await updateRideStat(rideData._id, "on_the_way");
+  updateRideStatus("on_the_way");
+
+  const directions = await directionsClient
+    .getDirections({
+      profile: "driving",
+      geometries: "geojson",
+      steps: true,
+      waypoints: [
+        { coordinates: start },
+        { coordinates: end },
+      ],
+    })
+    .send();
+
+  const route = directions.body.routes[0];
+  const stepsData = [];
+  route.legs.forEach((leg) =>
+    leg.steps.forEach((step) => {
+      stepsData.push({
+        instruction: step.maneuver.instruction,
+        distance: step.distance,
+        duration: step.duration,
+        maneuver: step.maneuver,
+        coords: step.geometry.coordinates,
+      });
+    })
+  );
+  setInstructions(stepsData);
+  setCurrentStep(0);
+}, [rideData]);
+
 
 // Move from current location → Pickup
 const handleStartToPickup = useCallback(async () => {
@@ -287,8 +386,6 @@ updateRideStatus("in_progress"); // ✅ Sync context
   setCurrentStep(0);
 
 }, [driverLocation, rideData]);
-
-
 
 // Move from pickup → midway stop(s)
 const handlePickupToMidway = useCallback(async () => {
@@ -340,8 +437,6 @@ updateRideStatus("on_the_way"); // ✅ Sync context
   setCurrentStep(0);
 
 }, [rideData, mapInstance, user]);
-
-
 
 // Stop at midway stop
 const handleAtMidwayStop = async () => {
@@ -933,147 +1028,6 @@ useEffect(() => {
     }
   };
 
-  // Start navigation do not need it anymore must be deleted
-  // const handleStartJourney = useCallback(async () => {
-  //   if (!routePath.length || journeyActiveRef.current || !rideData) return;
-
-  //   setJourneyStarted(true);
-  //   journeyActiveRef.current = true;
-
-  //   setIsActive(true); // Set global active state
-
-  //   // Update ride status locally and in global context
-  //   const updatedRide = {
-  //     ...rideData,
-  //     status: "in_progress", // Changed from "on_the_way" to "in_progress"
-  //     type: "active_ride"
-  //   };
-
-  //   startRide(updatedRide);
-
-  //   // 🔥 OPTIONAL: Update ride status in backend as well
-  //   try {
-  //     const response = await fetch(`${endPoint}/rides/status/${rideData._id}`, {
-  //       method: 'PUT',
-  //       headers: {
-  //         'Content-Type': 'application/json',
-  //       },
-  //       body: JSON.stringify({ status: 'in_progress' })
-  //     });
-      
-  //     if (response.ok) {
-  //       console.log('✅ Ride status updated to in_progress in backend');
-  //     } else {
-  //       console.warn('⚠️ Failed to update ride status in backend');
-  //     }
-  //   } catch (error) {
-  //     console.error('❌ Error updating ride status:', error);
-  //   }
-
-  //   const line = turf.lineString(routePath);
-  //   const routeLength = turf.length(line, { units: "kilometers" });
-
-  //   let traveled = 0;
-  //   const speed = 0.003;
-
-  //   const animate = () => {
-  //     if (traveled >= routeLength) {
-  //       setCurrentStep(instructions.length);
-  //       setRemaining({ distance: 0, duration: 0 });
-  //       setJourneyStarted(false);
-  //       journeyActiveRef.current = false;
-  //       return;
-  //     }
-
-  //     const currentPoint = turf.along(line, traveled, { units: "kilometers" });
-  //     const nextPoint = turf.along(line, traveled + 0.01, { units: "kilometers" });
-
-  //     const coords = currentPoint.geometry.coordinates;
-  //     const heading = turf.bearing(
-  //       turf.point(coords),
-  //       turf.point(nextPoint.geometry.coordinates)
-  //     );
-
-  //     // Update driver marker
-  //     const driverSource = mapInstance.current.getSource("driver");
-  //     if (driverSource) {
-  //       driverSource.setData({
-  //         type: "FeatureCollection",
-  //         features: [
-  //           {
-  //             type: "Feature",
-  //             geometry: { type: "Point", coordinates: coords },
-  //             properties: { bearing: heading },
-  //           },
-  //         ],
-  //       });
-  //     }
-
-  //     // Emit live driver location to backend
-  //     if (socketRef.current && user?._id && rideData?._id) {
-  //       socketRef.current.emit("driver-location-update", {
-  //         driverId: user._id,
-  //         rideId: rideData._id,
-  //         customerId: rideData?.customerId,
-  //         location: {
-  //           lat: coords[1],
-  //           lng: coords[0],
-  //           bearing: heading,
-  //         },
-  //       });
-  //     }
-
-  //     // Update camera
-  //     mapInstance.current.easeTo({
-  //       center: coords,
-  //       zoom: 17,
-  //       pitch: 65,
-  //       bearing: heading,
-  //       duration: 100,
-  //       easing: (t) => t,
-  //     });
-
-  //     // --- Sync step with marker ---
-  //     const snapped = turf.nearestPointOnLine(line, currentPoint, { units: "kilometers" });
-  //     const traveledSoFar = snapped.properties.location; // total km along route
-
-  //     let currentStepIndex = 0;
-  //     let cumulative = 0;
-  //     let remainingDistance = 0;
-
-  //     for (let i = 0; i < stepSegments.length; i++) {
-  //       const segment = stepSegments[i];
-  //       const segmentLine = turf.lineString(
-  //         routePath.slice(segment.startIndex, segment.endIndex + 1)
-  //       );
-  //       const segLength = turf.length(segmentLine, { units: "kilometers" });
-
-  //       if (traveledSoFar >= cumulative && traveledSoFar <= cumulative + segLength) {
-  //         currentStepIndex = i;
-  //         remainingDistance = cumulative + segLength - traveledSoFar;
-  //         break;
-  //       }
-  //       cumulative += segLength;
-  //     }
-
-  //     // Update UI state
-  //     setCurrentStep(currentStepIndex);
-  //     setRemaining({
-  //       distance: remainingDistance * 1000, // meters
-  //       duration: (remainingDistance / 0.06) * 60, // minutes at 60 km/h
-  //     });
-
-  //     // Advance along route
-  //     traveled += speed;
-
-  //     if (journeyActiveRef.current) {
-  //       requestAnimationFrame(animate);
-  //     }
-  //   };
-
-  //   animate();
-  // }, [routePath, instructions, stepSegments, startRide, setIsActive, rideData, updateRideStatus, user?._id]);
-
   useEffect(() => {
     return () => {
       journeyActiveRef.current = false;
@@ -1234,54 +1188,100 @@ useEffect(() => {
               </div>
             )}
           </div>
+{/* === RIDE ACTION BUTTONS === */}
 
-       {/* Ride action buttons based on current rideStatus */}
-{rideStatus === "accepted" && (
+{/* Step 1: Start to Pickup */}
+{rideStatus === "accepted" && !journeyStarted && (
   <button
     onClick={handleStartToPickup}
-    className="bg-blue-600 text-white md:px-6 md:py-3 px-3 text-[12px] md:text-xl py-2  rounded-xl font-semibold hover:bg-blue-700 transition"
+    className="bg-blue-600 text-white md:px-6 md:py-3 px-3 text-[12px] md:text-xl py-2 rounded-xl font-semibold hover:bg-blue-700 transition"
   >
     Start to Pickup
   </button>
 )}
 
-{rideStatus === "in_progress" && (
+{/* Step 2: I’m at Pickup */}
+{rideStatus === "in_progress" && !atPickup && (
   <button
-    onClick={handlePickupToMidway}
-    className="bg-green-600 text-white md:px-6 md:py-3 px-3 text-[12px] md:text-xl py-2  rounded-xl font-semibold hover:bg-green-700 transition"
+    onClick={() => setAtPickup(true)}
+    className="bg-yellow-500 text-white md:px-6 md:py-3 px-3 text-[12px] md:text-xl py-2 rounded-xl font-semibold hover:bg-yellow-600 transition"
   >
-    Go to Midway
+    I’m at Pickup
   </button>
 )}
 
+{/* Step 3: After pickup — either Midway or Dropoff */}
+{rideStatus === "in_progress" && atPickup && (
+  <>
+    {rideData?.midwayStops?.length > 0 ? (
+      <button
+        onClick={() => {
+          handlePickupToMidway();
+        }}
+        className="bg-green-600 text-white md:px-6 md:py-3 px-3 text-[12px] md:text-xl py-2 rounded-xl font-semibold hover:bg-green-700 transition"
+      >
+        Go to Midway
+      </button>
+    ) : (
+      !dropoffStarted && (
+        <button
+          onClick={() => {
+            handlePickupToDropoff();
+            setDropoffStarted(true);
+          }}
+          className="bg-blue-700 text-white md:px-6 md:py-3 px-3 text-[12px] md:text-xl py-2 rounded-xl font-semibold hover:bg-blue-800 transition"
+        >
+          Go to Dropoff
+        </button>
+      )
+    )}
+  </>
+)}
+
+{/* Step 4: Midway stop → confirm arrival */}
 {rideStatus === "at_stop" && (
   <button
-    onClick={handleMidwayToDropoff}
-    className="bg-blue-700 text-white md:px-6 md:py-3 px-3 text-[12px] md:text-xl py-2  rounded-xl font-semibold hover:bg-blue-800 transition"
+    onClick={() => {
+      handleMidwayToDropoff();
+      setDropoffStarted(true);
+    }}
+    className="bg-blue-700 text-white md:px-6 md:py-3 px-3 text-[12px] md:text-xl py-2 rounded-xl font-semibold hover:bg-blue-800 transition"
   >
     Go to Dropoff
   </button>
 )}
 
-{/* When ride reaches dropoff, show Finish button */}
-{rideStatus === "completed" && !rideFinished && (
+{/* Step 5: I’m at Dropoff */}
+{rideStatus === "on_the_way" && dropoffStarted && !atDropoff && (
+  <button
+    onClick={() => setAtDropoff(true)}
+    className="bg-orange-500 text-white md:px-6 md:py-3 px-3 text-[12px] md:text-xl py-2 rounded-xl font-semibold hover:bg-orange-600 transition"
+  >
+    I’m at Dropoff
+  </button>
+)}
+
+{/* Step 6: Finish Ride */}
+{rideStatus === "on_the_way" && atDropoff && !rideFinished && (
   <button
     onClick={() => {
       handleFinishRide();
-      setRideFinished(true); // set local state to hide all buttons
+      setRideFinished(true);
     }}
-    className="bg-purple-700 text-white md:px-6 md:py-3 px-3 text-[12px] md:text-xl py-2  rounded-xl font-semibold hover:bg-purple-800 transition"
+    className="bg-purple-700 text-white md:px-6 md:py-3 px-3 text-[12px] md:text-xl py-2 rounded-xl font-semibold hover:bg-purple-800 transition"
   >
     Finish Ride
   </button>
 )}
 
-{/* When ride is finished, show success text */}
+{/* Step 7: Done */}
 {rideStatus === "completed" && rideFinished && (
-  <p className="text-lg font-semibold text-green-600">
+  <p className="md:text-lg text-[12px] font-semibold text-green-600">
     ✅ Ride Completed Successfully
   </p>
 )}
+
+
 
 
 
