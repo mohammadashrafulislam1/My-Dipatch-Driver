@@ -842,6 +842,9 @@ useEffect(() => {
     mapInstance.current.on("wheel", () => setFollowDriver(false));
 mapInstance.current.on("mousedown", () => setFollowDriver(false));
 mapInstance.current.on("touchstart", () => setFollowDriver(false));
+// 🆕 Add these lines:
+mapInstance.current.on("dragstart", () => setFollowDriver(false));
+mapInstance.current.on("zoomstart", () => setFollowDriver(false));
 
     // --- Load driver arrow ---
     mapInstance.current.loadImage(
@@ -1155,7 +1158,10 @@ useEffect(() => {
 
       {/* CAMERA CONTROLS - Bottom Right */}
       <div className="absolute bottom-32 right-4 flex flex-col space-y-2 z-20">
-        <button onClick={centerOnDriver} className={`p-3 text-xl rounded-xl shadow-lg ${isDarkMode ? "bg-gray-700 text-white" : "bg-white text-gray-900"}`} title="Center on driver">
+        <button  onClick={() => {
+    setFollowDriver(true);   // ✅ re-enable following
+    centerOnDriver();        // ✅ recenter immediately
+  }}  className={`p-3 text-xl rounded-xl shadow-lg ${isDarkMode ? "bg-gray-700 text-white" : "bg-white text-gray-900"}`} title="Center on driver">
           <FaCrosshairs />
         </button>
 
