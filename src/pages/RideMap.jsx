@@ -1160,15 +1160,22 @@ useEffect(() => {
       <div className="absolute bottom-32 right-4 flex flex-col space-y-2 z-20">
         <button  onClick={() => {
     centerOnDriver();        // ✅ recenter immediately
+    setFollowDriver(true);   // ✅ keep camera follow ON
   }}  className={`p-3 text-xl rounded-xl shadow-lg ${isDarkMode ? "bg-gray-700 text-white" : "bg-white text-gray-900"}`} title="Center on driver">
           <FaCrosshairs />
         </button>
 
-        <button onClick={zoomIn} className={`p-3 text-xl rounded-xl shadow-lg ${isDarkMode ? "bg-gray-700 text-white" : "bg-white text-gray-900"}`} title="Zoom in">
+        <button  onClick={() => {
+    setFollowDriver(true);   // ✅ don't disable follow
+    zoomIn();
+  }} className={`p-3 text-xl rounded-xl shadow-lg ${isDarkMode ? "bg-gray-700 text-white" : "bg-white text-gray-900"}`} title="Zoom in">
           <FaPlus />
         </button>
 
-        <button onClick={zoomOut} className={`p-3 text-xl rounded-xl shadow-lg ${isDarkMode ? "bg-gray-700 text-white" : "bg-white text-gray-900"}`} title="Zoom out">
+        <button  onClick={() => {
+    setFollowDriver(true);   // ✅ same for zoom out
+    zoomOut();
+  }} className={`p-3 text-xl rounded-xl shadow-lg ${isDarkMode ? "bg-gray-700 text-white" : "bg-white text-gray-900"}`} title="Zoom out">
           <FaMinus />
         </button>
       </div>
