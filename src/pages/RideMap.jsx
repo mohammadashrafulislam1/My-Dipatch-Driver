@@ -1053,32 +1053,29 @@ useEffect(() => {
   return () => map.off("zoom", handleZoom);
 }, [mapLoaded]);
 
-  // Camera control functions
-  const centerOnDriver = useCallback(() => {
-    if (!mapInstance.current) return;
+// Camera control functions
+const centerOnDriver = useCallback(() => {
+  if (!mapInstance.current || !driverLocation) return;
 
-    const driverSource = mapInstance.current.getSource("driver");
-    if (driverSource) {
-      const driverData = driverSource._data;
-      if (driverData && driverData.features && driverData.features.length > 0) {
-        const driverCoords = driverData.features[0].geometry.coordinates;
-        mapInstance.current.easeTo({
-          center: driverCoords,
-          duration: 1000,
-        });
-      }
-    }
-  }, []);
+  mapInstance.current.easeTo({
+    center: driverLocation,
+    zoom: currentZoom, // ✅ maintain current zoom
+    duration: 1000,
+  });
+}, [driverLocation, currentZoom]);
 
-  const zoomIn = useCallback(() => {
-    if (!mapInstance.current) return;
-    mapInstance.current.zoomIn();
-  }, []);
+const zoomIn = useCallback(() => {
+  if (!mapInstance.current) return;
+  setCurrentZoom((z) => Math.min(z + 1, 22)); // ✅ keep zoom state in sync
+  mapInstance.current.zoomIn();
+}, []);
 
-  const zoomOut = useCallback(() => {
-    if (!mapInstance.current) return;
-    mapInstance.current.zoomOut();
-  }, []);
+const zoomOut = useCallback(() => {
+  if (!mapInstance.current) return;
+  setCurrentZoom((z) => Math.max(z - 1, 0)); // ✅ keep zoom state in sync
+  mapInstance.current.zoomOut();
+}, []);
+
 
   // Before the return statement, derive currentInstruction
   const currentInstruction = instructions[currentStep] || null;
