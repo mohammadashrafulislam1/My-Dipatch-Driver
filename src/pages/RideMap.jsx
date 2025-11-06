@@ -78,6 +78,7 @@ const {
   handleGeoError,
   LocationModal,
 } = useLocationPermission({ setDriverLocation });
+const [currentZoom, setCurrentZoom] = useState(14);
 
 
   // Add driverMarker ref definition
@@ -830,7 +831,7 @@ useEffect(() => {
     container: mapRef.current,
     style: mapStyle,
     center: [rideData.pickup.lng, rideData.pickup.lat],
-    zoom: 14,
+    zoom: currentZoom,
     pitch: 0,
     bearing: 0,
   });
@@ -1042,6 +1043,15 @@ useEffect(() => {
       journeyActiveRef.current = false;
     };
   }, []);
+useEffect(() => {
+  if (!mapInstance.current) return;
+  const map = mapInstance.current;
+
+  const handleZoom = () => setCurrentZoom(map.getZoom());
+  map.on("zoom", handleZoom);
+
+  return () => map.off("zoom", handleZoom);
+}, [mapLoaded]);
 
   // Camera control functions
   const centerOnDriver = useCallback(() => {
