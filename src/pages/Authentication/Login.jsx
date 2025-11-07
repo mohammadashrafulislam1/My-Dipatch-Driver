@@ -31,7 +31,8 @@ const Login = () => {
     try {
       await login(formData); // login function from useAuth
       toast.success("Login successful ✅ Redirecting...");
-      setTimeout(() => navigate("/"), 1500);
+      
+window.location.replace("/"); // instantly redirects with reload
     } catch (err) {
       console.error("Login error:", err.response?.data?.message || err.message);
       toast.error(err.response?.data?.message || "Login failed ❌");

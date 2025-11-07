@@ -1,6 +1,7 @@
 import { createContext, useEffect, useState } from "react";
 import axios from "axios";
 import { endPoint } from "../Components/ForAPIs";
+import LoadingScreen from "../Components/LoadingScreen";
 
 export const AuthContext = createContext();
 
@@ -74,7 +75,9 @@ const AuthProvider = ({ children }) => {
       setLoading(false);
     }
   };
-
+ if(loading){
+  <LoadingScreen/>
+ }
   // 🚪 Logout
   const logout = async () => {
     localStorage.removeItem("driverToken");

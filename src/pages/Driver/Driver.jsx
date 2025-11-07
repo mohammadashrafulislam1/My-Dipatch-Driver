@@ -21,6 +21,7 @@ import { endPoint } from "../../Components/ForAPIs";
 import FloatingDeactivateBtn from "../../Components/FloatingDeactivateBtn";
 import axios from "axios";
 import { useActiveRide } from "../../contexts/ActiveRideContext";
+import LoadingScreen from "../../Components/LoadingScreen";
 
 // Fix Leaflet marker icon paths
 delete L.Icon.Default.prototype._getIconUrl;
@@ -38,9 +39,10 @@ const Driver = () => {
   const [isActive, setIsActive] = useState(false);
   const [statusLoading, setStatusLoading] = useState(true);
   
-  // Use the global active ride context
   const { isActive: globalActive, activeRide, startRide, endRide } = useActiveRide();
-
+ if(loading){
+  <LoadingScreen/>
+ }
   const handleStartRide = async () => {
     try {
       await axios.put(`${endPoint}/user/${user._id}/status`, { status: "active" });
@@ -84,6 +86,29 @@ useEffect(() => {
     }
   }
 }, [globalActive, activeRide, user?._id]);
+useEffect(() => {
+  if (user && !globalActive) {
+    startRide({
+      driverId: user._id,
+      driverName: `${user.firstName} ${user.lastName}`,
+      type: "driver_available",
+      status: user.status === "active" ? "active" : "inactive",
+      timestamp: new Date().toISOString()
+    });
+  }
+}, [user, globalActive]);
+// ✅ Auto reload ONCE if ride state isn't showing after login
+useEffect(() => {
+  const hasReloaded = sessionStorage.getItem("driverPageReloaded");
+
+  if (user && !activeRide && !hasReloaded) {
+    console.log("🔄 Reloading once to fix missing ride state...");
+    sessionStorage.setItem("driverPageReloaded", "true");
+    window.location.reload();
+  }
+}, [user, activeRide]);
+
+  // Use the global active ride context
 
   // Fetch city coordinates and user status
   useEffect(() => {
