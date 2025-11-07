@@ -92,99 +92,133 @@ const Chat = () => {
   }, [messages, selectedUser]);
 
 
-  // 3. Fetch chat history when selectedUser and rideId are available
-  useEffect(() => {
-    const fetchChatHistory = async () => {
-        if (!selectedUser || !rideIdFromQuery || !user?._id) return;
+useEffect(() => {
+  const fetchChatHistory = async () => {
+    if (!selectedUser || !user?._id) return;
 
+    // ✅ Try to get ride ID from query or localStorage
+    let rideIdToUse = rideIdFromQuery;
+    if (!rideIdToUse) {
+      const storedRide = localStorage.getItem("activeRide");
+      if (storedRide) {
         try {
-            console.log(`Fetching chat history for ride: ${rideIdFromQuery}`);
-            const res = await axios.get(`${endPoint}/chat/driver/${rideIdFromQuery}`, { withCredentials: true });
-            const history = res.data.messages;
-
-            // Map the backend history format to the frontend state format
-            const formattedHistory = history.map(msg => ({
-                from: msg.senderId === user._id ? "me" : "other",
-                text: msg.message,
-                file: msg.fileUrl,
-                fileType: msg.fileType,
-                fileName: msg.fileUrl ? msg.fileUrl.split('/').pop() : 'File',
-                timestamp: msg.createdAt,
-                optimistic: false
-            }));
-
-            setMessages(prev => ({
-                ...prev,
-                [selectedUser.id]: formattedHistory,
-            }));
-
-        } catch (error) {
-            console.error("Failed to load chat history:", error.response?.data || error);
-            // Handle 404/no history gracefully by setting empty array
-            if (error.response?.status === 404) {
-                 setMessages(prev => ({ ...prev, [selectedUser.id]: [] }));
-            }
+          const parsedRide = JSON.parse(storedRide);
+          rideIdToUse = parsedRide._id;
+        } catch (err) {
+          console.error("Failed to parse activeRide:", err);
         }
-    };
+      }
+    }
 
-    fetchChatHistory();
+    if (!rideIdToUse) {
+      console.log("⚠️ No rideId found for chat history");
+      return;
+    }
 
-  }, [selectedUser, rideIdFromQuery, user?._id, endPoint]);
+    try {
+      console.log(`Fetching chat history for ride: ${rideIdToUse}`);
+      const res = await axios.get(`${endPoint}/chat/driver/${rideIdToUse}`, {
+        withCredentials: true,
+      });
+      const history = res.data.messages || [];
+
+      // ✅ Format messages
+      const formattedHistory = history.map((msg) => ({
+        from: msg.senderId === user._id ? "me" : "other",
+        text: msg.message,
+        file: msg.fileUrl,
+        fileType: msg.fileType,
+        fileName: msg.fileUrl ? msg.fileUrl.split("/").pop() : "File",
+        timestamp: msg.createdAt,
+        optimistic: false,
+      }));
+
+      setMessages((prev) => ({
+        ...prev,
+        [selectedUser.id]: formattedHistory,
+      }));
+    } catch (error) {
+      console.error("Failed to load chat history:", error.response?.data || error);
+    }
+  };
+
+  fetchChatHistory();
+}, [selectedUser, user?._id, rideIdFromQuery]);
+
   
-  // NEW: Fetch active ride and set chat users based on ride
-  useEffect(() => {
-    const fetchRideAndUser = async () => {
-      if (!user?._id || !rideIdFromQuery) {
+ useEffect(() => {
+  const fetchRideAndUser = async () => {
+    if (!user?._id) {
+      setUsers([]);
+      return;
+    }
+
+    // ✅ 1. Try to get ride from URL or localStorage
+    let rideIdToUse = rideIdFromQuery;
+    let activeRideData = null;
+
+    if (!rideIdToUse) {
+      const storedRide = localStorage.getItem("activeRide");
+      if (storedRide) {
+        try {
+          activeRideData = JSON.parse(storedRide);
+          rideIdToUse = activeRideData._id;
+          console.log("Loaded active ride from localStorage:", activeRideData);
+        } catch (err) {
+          console.error("Failed to parse activeRide from localStorage:", err);
+        }
+      }
+    }
+
+    if (!rideIdToUse) {
+      console.log("No active ride found in URL or localStorage.");
+      setUsers([]);
+      return;
+    }
+
+    try {
+      // ✅ 2. Use stored data if available
+      let ride = activeRideData;
+      if (!ride) {
+        const rideRes = await axios.get(`${endPoint}/rides/${rideIdToUse}`);
+        ride = rideRes.data.ride;
+      }
+
+      setActiveRide(ride);
+      setRideStatus(ride.status);
+
+      // ✅ 3. Determine recipient
+      let recipientId = null;
+      if (user.role === "driver" && ride.customerId) {
+        recipientId = ride.customerId;
+      } else if (user.role === "customer" && ride.driverId) {
+        recipientId = ride.driverId;
+      }
+
+      if (recipientId) {
+        const userRes = await axios.get(`${endPoint}/user/${recipientId}`);
+        const recipientUser = userRes.data;
+
+        const chatUser = {
+          id: recipientUser._id,
+          firstname: recipientUser.firstName,
+          lastname: recipientUser.lastName,
+        };
+        setUsers([chatUser]);
+
+        if (!selectedUser) setSelectedUser(chatUser);
+      } else {
         setUsers([]);
-        return;
       }
-      
-      try {
-        console.log(rideIdFromQuery)
-        // 1. Fetch the active ride details
-        const rideRes = await axios.get(`${endPoint}/rides/${rideIdFromQuery}`);
-        const ride = rideRes.data.ride;
-        setActiveRide(ride);
-        setRideStatus(ride.status);
-        
-        // 2. Determine the chat recipient's ID (the other participant in the ride)
-        let recipientId = null;
-        if (user.role === 'driver' && ride.customerId) {
-            recipientId = ride.customerId;
-        } else if (user.role === 'customer' && ride.driverId) {
-            recipientId = ride.driverId;
-        }
-        
-        if (recipientId) {
-            // 3. Fetch the recipient's details
-            const userRes = await axios.get(`${endPoint}/user/${recipientId}`);
-            const recipientUser = userRes.data;
-            
-            // Format the user object to match the component's expected structure
-            const chatUser = {
-                id: recipientUser._id, 
-                firstname: recipientUser.firstName, 
-                lastname: recipientUser.lastName,
-                // Add any other necessary fields
-            };
-            setUsers([chatUser]);
+    } catch (err) {
+      console.error("Failed to load ride or user:", err);
+      setUsers([]);
+    }
+  };
 
-            // If a user is pre-selected via query param, select them
-            if (userIdFromQuery && chatUser.id === userIdFromQuery && !selectedUser) {
-                setSelectedUser(chatUser);
-            }
-        } else {
-            setUsers([]);
-        }
-        
-      } catch (err) {
-        console.error("Failed to load ride or user:", err);
-        setUsers([]); // Clear users on failure
-      }
-    };
-  
-    fetchRideAndUser();
-  }, [endPoint, user?._id, rideIdFromQuery, userIdFromQuery, selectedUser]); 
+  fetchRideAndUser();
+}, [endPoint, user?._id, rideIdFromQuery, userIdFromQuery, selectedUser]);
+
 
   // Check if the user is selectable (i.e., if messaging is allowed)
   const isUserSelectable = () => canSendMessages;

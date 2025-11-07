@@ -1,12 +1,18 @@
+// GlobalRideStatus.jsx - UPDATED
 import { useActiveRide } from '../contexts/ActiveRideContext';
 import { FaCar, FaMapMarkerAlt, FaChevronRight } from 'react-icons/fa';
 import useAuth from './useAuth';
 
 const GlobalRideStatus = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { isActive, activeRide } = useActiveRide();
 
-  // 🚫 Hide if no user or ride doesn’t belong to this driver
+  // 🚫 Show nothing while checking authentication
+  if (authLoading) {
+    return null;
+  }
+
+  // 🚫 Hide if no user or ride doesn't belong to this driver
   if (
     !user || 
     !isActive || 

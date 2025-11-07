@@ -1,3 +1,4 @@
+// DriverNotification.jsx - UPDATED
 import { Clock, MapPin } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import io from "socket.io-client";
@@ -8,7 +9,7 @@ import { useNavigate } from "react-router-dom";
 import { useActiveRide } from "../contexts/ActiveRideContext";
 
 export default function DriverNotification({ isActive }) {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [queue, setQueue] = useState([]);
   const [isVisible, setIsVisible] = useState(false);
   const [progress, setProgress] = useState(100);
@@ -24,9 +25,12 @@ export default function DriverNotification({ isActive }) {
   // Use ActiveRide context so accepted rides persist across pages
   const { startRide } = useActiveRide();
 
+  // 🚫 Don't connect to socket if auth is still loading or no user
+  const shouldConnect = isActive && user?._id && !authLoading;
+
   // Connect to socket
   useEffect(() => {
-    if (!isActive || !user?._id) return;
+    if (!shouldConnect) return;
 
     socketRef.current = io("https://my-dipatch-backend.onrender.com", {
       transports: ["websocket"],
@@ -63,7 +67,7 @@ export default function DriverNotification({ isActive }) {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [isActive, user?._id]);
+  }, [shouldConnect, user?._id]);
 
   // Show next ride when queue updates
   useEffect(() => {
@@ -72,7 +76,12 @@ export default function DriverNotification({ isActive }) {
     }
   }, [queue, isVisible]);
 
-  // Play notification sound
+  // 🚫 Don't render anything if auth is still loading
+  if (authLoading) {
+    return null;
+  }
+
+  // Rest of your component remains the same...
   function playSound() {
     if (!audioRef.current) {
       audioRef.current = new Audio("/notification.mp3");
@@ -120,38 +129,32 @@ export default function DriverNotification({ isActive }) {
     progressRef.current = null;
   }
 
- async function handleAccept() {
-  const ride = queue[0];
-  if (!ride?._id || !user?._id) return;
+  async function handleAccept() {
+    const ride = queue[0];
+    if (!ride?._id || !user?._id) return;
 
-  try {
-    // ✅ Capture the response
-    const res = await axios.put(`${endPoint}/rides/status/${ride._id}`, {
-      status: "accepted",
-      driverId: user._id, // ✅ Assign the current driver
-    });
+    try {
+      const res = await axios.put(`${endPoint}/rides/status/${ride._id}`, {
+        status: "accepted",
+        driverId: user._id,
+      });
 
-    console.log("✅ Ride accepted:", res.data);
+      console.log("✅ Ride accepted:", res.data);
 
-    // ✅ Clear queue & stop sound
-    setQueue([]);
-    setIsVisible(false);
-    stopSound();
-    if (timerRef.current) clearTimeout(timerRef.current);
-    if (progressRef.current) clearInterval(progressRef.current);
-    timerRef.current = null;
-    progressRef.current = null;
+      setQueue([]);
+      setIsVisible(false);
+      stopSound();
+      if (timerRef.current) clearTimeout(timerRef.current);
+      if (progressRef.current) clearInterval(progressRef.current);
+      timerRef.current = null;
+      progressRef.current = null;
 
-    // ✅ Persist active ride globally
-    startRide(res.data);
-
-    // ✅ Navigate to map with ride data
-    navigate(`/ride/${ride._id}`, { state: res.data });
-  } catch (err) {
-    console.error("❌ Failed to accept ride:", err);
+      startRide(res.data);
+      navigate(`/ride/${ride._id}`, { state: res.data });
+    } catch (err) {
+      console.error("❌ Failed to accept ride:", err);
+    }
   }
-}
-
 
   function handleDismiss() {
     console.log("❌ Ride dismissed:", queue[0]?._id);
