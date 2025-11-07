@@ -101,6 +101,7 @@ const [currentZoom, setCurrentZoom] = useState(14);
   const [remaining, setRemaining] = useState({ distance: 0, duration: 0 });
   const [stepSegments, setStepSegments] = useState([]);
   const [customer, setCustomer] = useState(null);
+const hasFittedBounds = useRef(false);
 
   // Initialize directly from localStorage for dark mode
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -524,7 +525,11 @@ updateRideStatus("completed"); // ✅ Sync context
 
   // Fetch directions and add layers (depends on map being loaded and rideData)
   const fetchDirections = useCallback(() => {
-    if (!mapInstance.current || !rideData) return;
+ if (!mapInstance.current || !rideData) return;
+
+// ✅ only skip fitBounds if user manually moved
+const shouldAutoFit = followDriver || !hasFittedBounds.current;
+
 
     const waypoints = [
       { coordinates: [rideData.pickup.lng, rideData.pickup.lat] },
@@ -806,12 +811,13 @@ if (driverLocation && rideData?.pickup) {
         setRoutePath(path);
         setInstructions(stepsData);
         setStepSegments(segments);
+if (path.length > 0 && !hasFittedBounds.current) {
+  const bounds = new mapboxgl.LngLatBounds();
+  path.forEach((c) => bounds.extend(c));
+  mapInstance.current.fitBounds(bounds, { padding: 80, duration: 1500 });
+  hasFittedBounds.current = true; // ✅ prevent future auto-fit
+}
 
-        if (path.length > 0) {
-          const bounds = new mapboxgl.LngLatBounds();
-          path.forEach((c) => bounds.extend(c));
-          mapInstance.current.fitBounds(bounds, { padding: 80, duration: 1500 });
-        }
       })
       .catch((err) => {
         console.error("Directions API error", err);
@@ -1043,38 +1049,44 @@ useEffect(() => {
       journeyActiveRef.current = false;
     };
   }, []);
+
 useEffect(() => {
   if (!mapInstance.current) return;
   const map = mapInstance.current;
-
-  const handleZoom = () => setCurrentZoom(map.getZoom());
-  map.on("zoom", handleZoom);
-
-  return () => map.off("zoom", handleZoom);
+  const syncZoom = () => setCurrentZoom(map.getZoom());
+  map.on("zoomend", syncZoom);
+  return () => map.off("zoomend", syncZoom);
 }, [mapLoaded]);
 
-// Camera control functions
+// === CAMERA CONTROL FUNCTIONS ===
 const centerOnDriver = useCallback(() => {
   if (!mapInstance.current || !driverLocation) return;
 
+  // 🔹 Re-enable camera follow mode
+  setFollowDriver(true);
+console.log("Centering on driver:", driverLocation, "Zoom:", currentZoom);
+
+  // 🔹 Smoothly re-center on driver’s current location (without resetting zoom)
   mapInstance.current.easeTo({
     center: driverLocation,
-    zoom: mapInstance.current.getZoom(), // ✅ live zoom
-    duration: 1000,
+    zoom: currentZoom,  // use our controlled zoom state
+    duration: 800,
   });
 }, [driverLocation, currentZoom]);
 
 const zoomIn = useCallback(() => {
   if (!mapInstance.current) return;
-  setCurrentZoom((z) => Math.min(z + 1, 22)); // ✅ keep zoom state in sync
-  mapInstance.current.zoomIn();
-}, []);
+  const newZoom = Math.min(currentZoom + 1, 22);
+  setCurrentZoom(newZoom);
+  mapInstance.current.easeTo({ zoom: newZoom, duration: 400 });
+}, [currentZoom]);
 
 const zoomOut = useCallback(() => {
   if (!mapInstance.current) return;
-  setCurrentZoom((z) => Math.max(z - 1, 0)); // ✅ keep zoom state in sync
-  mapInstance.current.zoomOut();
-}, []);
+  const newZoom = Math.max(currentZoom - 1, 0);
+  setCurrentZoom(newZoom);
+  mapInstance.current.easeTo({ zoom: newZoom, duration: 400 });
+}, [currentZoom]);
 
 
   // Before the return statement, derive currentInstruction
@@ -1163,29 +1175,33 @@ const zoomOut = useCallback(() => {
         </button>
       </div>
 
-      {/* CAMERA CONTROLS - Bottom Right */}
-      <div className="absolute bottom-32 right-4 flex flex-col space-y-2 z-20">
-        <button  onClick={() => {
-    centerOnDriver();        // ✅ recenter immediately
-    setFollowDriver(true);   // ✅ keep camera follow ON
-  }}  className={`p-3 text-xl rounded-xl shadow-lg ${isDarkMode ? "bg-gray-700 text-white" : "bg-white text-gray-900"}`} title="Center on driver">
-          <FaCrosshairs />
-        </button>
+     {/* CAMERA CONTROLS - Bottom Right */}
+<div className="absolute bottom-32 right-4 flex flex-col space-y-2 z-20">
+  <button
+    onClick={centerOnDriver}
+    className={`p-3 text-xl rounded-xl shadow-lg ${isDarkMode ? "bg-gray-700 text-white" : "bg-white text-gray-900"}`}
+    title="Center on driver"
+  >
+    <FaCrosshairs />
+  </button>
 
-        <button  onClick={() => {
-    setFollowDriver(true);   // ✅ don't disable follow
-    zoomIn();
-  }} className={`p-3 text-xl rounded-xl shadow-lg ${isDarkMode ? "bg-gray-700 text-white" : "bg-white text-gray-900"}`} title="Zoom in">
-          <FaPlus />
-        </button>
+  <button
+    onClick={zoomIn}
+    className={`p-3 text-xl rounded-xl shadow-lg ${isDarkMode ? "bg-gray-700 text-white" : "bg-white text-gray-900"}`}
+    title="Zoom in"
+  >
+    <FaPlus />
+  </button>
 
-        <button  onClick={() => {
-    setFollowDriver(true);   // ✅ same for zoom out
-    zoomOut();
-  }} className={`p-3 text-xl rounded-xl shadow-lg ${isDarkMode ? "bg-gray-700 text-white" : "bg-white text-gray-900"}`} title="Zoom out">
-          <FaMinus />
-        </button>
-      </div>
+  <button
+    onClick={zoomOut}
+    className={`p-3 text-xl rounded-xl shadow-lg ${isDarkMode ? "bg-gray-700 text-white" : "bg-white text-gray-900"}`}
+    title="Zoom out"
+  >
+    <FaMinus />
+  </button>
+</div>
+
 
       {/* SPEED LIMIT - Bottom Left */}
       <div className={`absolute bottom-32 left-4 text-center p-3 rounded-xl shadow-lg border-4 ${isDarkMode ? "border-white bg-white text-black" : "border-white bg-white text-black"}`}>
