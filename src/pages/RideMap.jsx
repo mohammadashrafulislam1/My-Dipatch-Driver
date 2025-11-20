@@ -341,6 +341,8 @@ useEffect(() => {
 
     return () => socket.disconnect();
   }, [user?._id]);
+
+
   // 🔧 Reusable status update helper
 const updateRideStat = async (id, status) => {
   try {
@@ -364,13 +366,22 @@ const showRouteToNextDestination = useCallback(async () => {
   let destination;
   let destinationName = "";
 
-  // Determine next destination
-  if (rideData?.midwayStops?.length > 0) {
+  // 🔥 Correct routing logic
+  if (rideStatus === "at_stop") {
+    // Already reached midway → go to dropoff
+    destination = [rideData.dropoff.lng, rideData.dropoff.lat];
+    destinationName = "dropoff";
+  } 
+  else if (rideData?.midwayStops?.length > 0) {
     // Going to midway stop
-    destination = [rideData.midwayStops[0].lng, rideData.midwayStops[0].lat];
+    destination = [
+      rideData.midwayStops[0].lng,
+      rideData.midwayStops[0].lat
+    ];
     destinationName = "midway stop";
-  } else {
-    // Going directly to dropoff
+  } 
+  else {
+    // No midway → go directly to dropoff
     destination = [rideData.dropoff.lng, rideData.dropoff.lat];
     destinationName = "dropoff";
   }
@@ -386,13 +397,13 @@ const showRouteToNextDestination = useCallback(async () => {
         steps: true,
         waypoints: [
           { coordinates: driverLocation },
-          { coordinates: destination },
+          { coordinates: destination }
         ],
       })
       .send();
 
     const route = directions.body.routes[0];
-    
+
     // Extract steps for instructions
     const stepsData = [];
     route.legs.forEach((leg) =>
@@ -407,22 +418,23 @@ const showRouteToNextDestination = useCallback(async () => {
       })
     );
 
-    // 🗺️ ADD THE ROUTE TO THE MAP
+    // 🗺️ Add/Update route on map
     const geojson = {
       type: "Feature",
       geometry: route.geometry,
     };
 
-    // Remove existing route if any
     if (mapInstance.current.getSource("current-to-destination")) {
+      // Update existing route
       mapInstance.current.getSource("current-to-destination").setData(geojson);
     } else {
+      // Add new source + layers
       mapInstance.current.addSource("current-to-destination", {
         type: "geojson",
         data: geojson,
       });
 
-      // Add stroke line
+      // Main route (outer stroke)
       mapInstance.current.addLayer(
         {
           id: "current-to-destination-stroke",
@@ -440,7 +452,7 @@ const showRouteToNextDestination = useCallback(async () => {
         "driver-layer"
       );
 
-      // Add inner bright line
+      // Inner route (bright line)
       mapInstance.current.addLayer(
         {
           id: "current-to-destination-line",
@@ -461,14 +473,12 @@ const showRouteToNextDestination = useCallback(async () => {
 
     setInstructions(stepsData);
     setCurrentStep(0);
-   
     setFollowDriver(true);
 
   } catch (error) {
     console.error("Failed to fetch route to next destination:", error);
   }
-
-}, [driverLocation, rideData]);
+}, [driverLocation, rideData, rideStatus]);
 
 // Move from current location → Pickup
 const handleStartToPickup = useCallback(async () => {
@@ -539,6 +549,9 @@ const handlePickupToMidway = useCallback(async () => {
 
   await updateRideStat(rideData._id, "on_the_way");
   updateRideStatus("on_the_way");
+setAtPickup(true);        // REQUIRED
+setDropoffStarted(false); // RESET to allow next button
+          removePickupMarkerAndRoute();
 
   try {
     // 🧹 REMOVE MAIN ROUTE FIRST
@@ -1372,6 +1385,24 @@ const fetchDirections = useCallback(() => {
     });
 }, [rideData, isDarkMode, driverLocation, atPickup]);
 
+const removePickupMarkerAndRoute = () => {
+  const map = mapInstance.current;
+  if (!map) return;
+
+  // REMOVE PICKUP MARKER
+  if (map.getLayer("pickup-layer")) map.removeLayer("pickup-layer");
+  if (map.getSource("pickup")) map.removeSource("pickup");
+
+  // REMOVE CURRENT → PICKUP ROUTE
+  if (map.getLayer("current-to-pickup-line")) map.removeLayer("current-to-pickup-line");
+  if (map.getLayer("current-to-pickup-stroke")) map.removeLayer("current-to-pickup-stroke");
+  if (map.getLayer("current-to-pickup-dash")) map.removeLayer("current-to-pickup-dash");
+
+  if (map.getSource("current-to-pickup")) map.removeSource("current-to-pickup");
+
+  console.log("✅ Pickup marker + route removed");
+};
+
 const removeMainRoute = () => {
   const map = mapInstance.current;
   if (!map) return;
@@ -1935,18 +1966,8 @@ setShowMainRoute(false);
   setAtPickup(true);
   removeMainRoute();
 setShowMainRoute(false);
+  removePickupMarkerAndRoute();
   showRouteToNextDestination();
-      
-      // 🧹 Remove pickup marker and connecting line
-      const map = mapInstance.current;
-      if (map) {
-        if (map.getLayer("pickup-layer")) map.removeLayer("pickup-layer");
-        if (map.getSource("pickup")) map.removeSource("pickup");
-        if (map.getLayer("current-to-pickup-line")) map.removeLayer("current-to-pickup-line");
-        if (map.getLayer("current-to-pickup-stroke")) map.removeLayer("current-to-pickup-stroke");
-        if (map.getSource("current-to-pickup")) map.removeSource("current-to-pickup");
-        console.log("✅ Pickup marker and route removed");
-      }
     }}
     className="bg-yellow-500 text-white md:px-6 md:py-3 px-3 text-[12px] md:text-xl py-2 rounded-xl font-semibold hover:bg-yellow-600 transition"
   >
@@ -1984,6 +2005,20 @@ setShowMainRoute(false);
   </>
 )}
 
+{/* Step 3.1: I'm at Stop (Midway) */}
+{rideStatus === "on_the_way" && rideData?.midwayStops?.length > 0 && !dropoffStarted && (
+<button
+  onClick={() => {
+    handleAtMidwayStop(); 
+    // 🔥 ADD THIS FIX
+      showRouteToNextDestination();
+  }}
+  className="bg-yellow-600 text-white md:px-6 md:py-3 px-3 text-[12px] md:text-xl py-2 rounded-xl font-semibold hover:bg-yellow-700 transition"
+>
+  I'm at Stop
+</button>
+)}
+
 {/* Step 4: Midway stop → confirm arrival */}
 {rideStatus === "at_stop" && (
   <button
@@ -1991,8 +2026,11 @@ setShowMainRoute(false);
       handleMidwayToDropoff();
       setDropoffStarted(true);
   removeMainRoute();
-setShowMainRoute(false);
-  showRouteToNextDestination();
+setShowMainRoute(false); 
+  setTimeout(() => {
+    showRouteToNextDestination();
+    console.log("➡️ Routing from current to dropoff");
+  }, 50);
     }}
     className="bg-blue-700 text-white md:px-6 md:py-3 px-3 text-[12px] md:text-xl py-2 rounded-xl font-semibold hover:bg-blue-800 transition"
   >
