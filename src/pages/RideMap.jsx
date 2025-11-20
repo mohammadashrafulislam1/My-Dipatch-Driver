@@ -1378,7 +1378,8 @@ const fetchDirections = useCallback(() => {
       }
 
       // --- Midway stops ---
-      if (rideData.midwayStops?.length && !mapInstance.current.getSource("midway-stops")) {
+      if (!atPickup && !atDropoff && rideData.midwayStops?.length 
+    && !mapInstance.current.getSource("midway-stops")) {
         mapInstance.current.addSource("midway-stops", {
           type: "geojson",
           data: {
@@ -1443,7 +1444,7 @@ const fetchDirections = useCallback(() => {
       }
 
       // --- Drop-off marker ---
-      if (!mapInstance.current.getSource("dropoff")) {
+      if (!rideFinished && !atDropoff && !mapInstance.current.getSource("dropoff")) {
         mapInstance.current.addSource("dropoff", {
           type: "geojson",
           data: {
