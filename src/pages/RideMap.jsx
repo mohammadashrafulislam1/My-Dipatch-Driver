@@ -1407,11 +1407,19 @@ const removeMainRoute = () => {
   const map = mapInstance.current;
   if (!map) return;
 
+  // Remove “main route” layers
   if (map.getLayer("route")) map.removeLayer("route");
   if (map.getLayer("route-stroke")) map.removeLayer("route-stroke");
-  if (map.getSource("route")) map.removeSource("route");
 
-  console.log("🧹 Main pickup→dropoff route removed");
+  // Remove “current-to-destination” route layers
+  if (map.getLayer("current-to-destination-line")) map.removeLayer("current-to-destination-line");
+  if (map.getLayer("current-to-destination-stroke")) map.removeLayer("current-to-destination-stroke");
+
+  // Remove sources
+  if (map.getSource("route")) map.removeSource("route");
+  if (map.getSource("current-to-destination")) map.removeSource("current-to-destination");
+
+  console.log("🧹 All old routes removed");
 };
 
 // 🛠️ FIX: Enhanced useEffect to handle initial route display and updates
