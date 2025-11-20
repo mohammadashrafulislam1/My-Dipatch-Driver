@@ -482,20 +482,33 @@ const showRouteToNextDestination = useCallback(async () => {
 
 // Move from current location → Pickup
 const handleStartToPickup = useCallback(async () => {
-  if (!driverLocation || !rideData?.pickup) return;
+
+  if (!driverLocation || !rideData?.pickup || !mapInstance.current) return;
 
   setRideStatus("in_progress");
   setJourneyStarted(true);
-  setFollowDriver(true); // ✅ enable camera follow
-        await updateRideStat(rideData._id, "in_progress");
-updateRideStatus("in_progress"); // ✅ Sync context
+  setFollowDriver(true);
 
+  await updateRideStat(rideData._id, "in_progress");
+  updateRideStatus("in_progress");
 
+  const map = mapInstance.current;
+
+  // 🧹 REMOVE ALL OTHER ROUTES
+  if (map.getLayer("route")) map.removeLayer("route");
+  if (map.getLayer("route-stroke")) map.removeLayer("route-stroke");
+  if (map.getSource("route")) map.removeSource("route");
+
+  if (map.getLayer("current-to-destination-line")) map.removeLayer("current-to-destination-line");
+  if (map.getLayer("current-to-destination-stroke")) map.removeLayer("current-to-destination-stroke");
+  if (map.getSource("current-to-destination")) map.removeSource("current-to-destination");
+
+  // Fetch ONLY current → pickup route
   const directions = await directionsClient
     .getDirections({
       profile: "driving",
       geometries: "geojson",
-      steps: true, // ✅ must be true
+      steps: true,
       waypoints: [
         { coordinates: driverLocation },
         { coordinates: [rideData.pickup.lng, rideData.pickup.lat] },
@@ -505,10 +518,8 @@ updateRideStatus("in_progress"); // ✅ Sync context
 
   const route = directions.body.routes[0];
   const path = route.geometry.coordinates;
-  const line = turf.lineString(path);
-  const totalDistance = turf.length(line, { units: "kilometers" });
 
-  // ✅ Extract instructions
+  // Extract instructions
   const stepsData = [];
   route.legs.forEach((leg) =>
     leg.steps.forEach((step) => {
@@ -526,16 +537,163 @@ updateRideStatus("in_progress"); // ✅ Sync context
 
 }, [driverLocation, rideData]);
 
+const removeMidwayStopMarker = () => {
+  const map = mapInstance.current;
+  if (!map) {
+    console.log("❌ Map instance not available");
+    return;
+  }
 
-// Stop at midway stop
+  try {
+    // REMOVE MIDWAY STOP MARKER LAYER
+    if (map.getLayer("midway-layer")) {
+      map.removeLayer("midway-layer");
+      console.log("✅ Midway layer removed");
+    } else {
+      console.log("⚠️ Midway layer not found");
+    }
+
+    // REMOVE MIDWAY STOP MARKER SOURCE
+    if (map.getSource("midway-stops")) {
+      map.removeSource("midway-stops");
+      console.log("✅ Midway stops source removed");
+    } else {
+      console.log("⚠️ Midway stops source not found");
+    }
+
+    // Also remove any midway stop popups or event listeners
+    const popups = document.querySelectorAll('.mapboxgl-popup');
+    popups.forEach(popup => popup.remove());
+
+    console.log("✅ Midway stop marker cleanup completed");
+
+  } catch (error) {
+    console.error("❌ Error removing midway stop marker:", error);
+  }
+};
+
+const removeFirstMidwayStop = () => {
+  if (!rideData?.midwayStops?.length) return;
+  
+  // Remove the first midway stop from the rideData
+  const updatedMidwayStops = [...rideData.midwayStops];
+  updatedMidwayStops.shift(); // Remove the first stop
+  
+  // Update rideData state
+  setRideData(prev => ({
+    ...prev,
+    midwayStops: updatedMidwayStops
+  }));
+  
+  console.log("✅ First midway stop removed from ride data");
+};
+
+// Stop at midway stop and immediately show route to dropoff
 const handleAtMidwayStop = async () => {
   setRideStatus("at_stop");
+  
+  // Update backend status
   await fetch(`${endPoint}/rides/status/${rideData._id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ status: "at_stop" }),
   });
+  
   console.log("🛑 Reached midway stop");
+  
+    // 🆕 REMOVE THE MIDWAY STOP MARKER FROM MAP
+  removeMidwayStopMarker();
+  
+  // 🆕 REMOVE THE FIRST MIDWAY STOP FROM DATA
+  removeFirstMidwayStop();
+  
+  // 🛠️ FIX: Immediately show route from current location to dropoff
+  setTimeout(() => {
+    showRouteToDropoffFromCurrentLocation();
+  }, 100);
+};
+
+// Separate function for the route logic
+const showRouteToDropoffFromCurrentLocation = async () => {
+  try {
+    if (!driverLocation || !rideData.dropoff || !mapInstance.current) return;
+
+    // 🧹 REMOVE ANY EXISTING CURRENT-TO-DESTINATION ROUTE FIRST
+    const map = mapInstance.current;
+    if (map.getLayer("current-to-destination-line")) map.removeLayer("current-to-destination-line");
+    if (map.getLayer("current-to-destination-stroke")) map.removeLayer("current-to-destination-stroke");
+    if (map.getSource("current-to-destination")) map.removeSource("current-to-destination");
+    console.log("✅ Previous destination route removed");
+
+    // ✅ Fetch route from CURRENT LOCATION to dropoff
+    const directions = await directionsClient
+      .getDirections({
+        profile: "driving",
+        geometries: "geojson",
+        steps: true,
+        waypoints: [
+          { coordinates: driverLocation },
+          { coordinates: [rideData.dropoff.lng, rideData.dropoff.lat] },
+        ],
+      })
+      .send();
+
+    const route = directions.body.routes[0];
+    
+    // ✅ Extract detailed step-by-step instructions
+    const stepsData = [];
+    route.legs.forEach((leg) =>
+      leg.steps.forEach((step) => {
+        stepsData.push({
+          instruction: step.maneuver.instruction,
+          distance: step.distance,
+          duration: step.duration,
+          maneuver: step.maneuver,
+          coords: step.geometry.coordinates,
+        });
+      })
+    );
+
+    // 🗺️ ADD THE NEW ROUTE TO THE MAP
+    const geojson = {
+      type: "Feature",
+      geometry: route.geometry,
+    };
+
+    mapInstance.current.addSource("current-to-destination", {
+      type: "geojson",
+      data: geojson,
+    });
+
+    mapInstance.current.addLayer(
+      {
+        id: "current-to-destination-stroke",
+        type: "line",
+        source: "current-to-destination",
+        layout: { "line-cap": "round", "line-join": "round" },
+        paint: { "line-color": "#034880", "line-width": 14 },
+      },
+      "driver-layer"
+    );
+
+    mapInstance.current.addLayer(
+      {
+        id: "current-to-destination-line",
+        type: "line",
+        source: "current-to-destination",
+        layout: { "line-cap": "round", "line-join": "round" },
+        paint: { "line-color": "#42A5F5", "line-width": 8 },
+      },
+      "driver-layer"
+    );
+
+    setInstructions(stepsData);
+    setCurrentStep(0);
+    console.log("✅ Route to dropoff displayed");
+
+  } catch (error) {
+    console.error("Failed to fetch route to dropoff:", error);
+  }
 };
 
 
@@ -962,15 +1120,20 @@ useEffect(() => {
 useEffect(() => {
   if (rideFinished && mapInstance.current) {
     const map = mapInstance.current;
-    
+
     // Remove destination route
     if (map.getLayer("current-to-destination-line")) map.removeLayer("current-to-destination-line");
     if (map.getLayer("current-to-destination-stroke")) map.removeLayer("current-to-destination-stroke");
     if (map.getSource("current-to-destination")) map.removeSource("current-to-destination");
-    
-    console.log("✅ Destination route cleaned up");
+
+    // 🧹 REMOVE DROPOFF MARKER (fine)
+    if (map.getLayer("dropoff-layer")) map.removeLayer("dropoff-layer");
+    if (map.getSource("dropoff")) map.removeSource("dropoff");
+
+    console.log("🗑️ Dropoff marker removed + destination route cleaned");
   }
 }, [rideFinished]);
+
 
 // 🛠️ FIX: Enhanced fetchDirections function with better current-to-pickup route
 const fetchDirections = useCallback(() => {
@@ -1959,6 +2122,7 @@ useEffect(() => {
   removeMainRoute();
 setShowMainRoute(false);
   handleStartToPickup();
+  showRouteToNextDestination();
 }}
 
     className="bg-blue-600 text-white md:px-6 md:py-3 px-3 text-[12px] md:text-xl py-2 rounded-xl font-semibold hover:bg-blue-700 transition"
@@ -2018,8 +2182,6 @@ setShowMainRoute(false);
 <button
   onClick={() => {
     handleAtMidwayStop(); 
-    // 🔥 ADD THIS FIX
-      showRouteToNextDestination();
   }}
   className="bg-yellow-600 text-white md:px-6 md:py-3 px-3 text-[12px] md:text-xl py-2 rounded-xl font-semibold hover:bg-yellow-700 transition"
 >
@@ -2076,7 +2238,9 @@ setShowMainRoute(false);
   </p>
 )}
 
-          <button onClick={handleChatWithCustomer} className={`p-2 rounded-full text-2xl ${isDarkMode ? "text-white" : "text-gray-900"}`} title="Chat with customer">
+          <button onClick={handleChatWithCustomer} className={`ml-3 py-3 flex items-center justify-center gap-3 rounded-xl px-3 text-2xl 
+            ${isDarkMode ? "text-white bg-black" : "text-gray-900 bg-white"}`} title="Chat with customer">
+            <p className="!text-[18px] font-semibold">Chat With Customer</p>
             <FaComments />
           </button>
         </div>
