@@ -12,6 +12,15 @@ import io from "socket.io-client";
 import useAuth from "../Components/useAuth";
 import useLocationPermission from "../Components/useLocationPermission.jsx";
 
+// SAFARI FIX — prevent duplicate addSource/addLayer crashes
+function safeAddSource(map, id, source) {
+  if (!map.getSource(id)) map.addSource(id, source);
+}
+
+function safeAddLayer(map, layer) {
+  if (!map.getLayer(layer.id)) map.addLayer(layer);
+}
+
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 const directionsClient = mbxDirections({ accessToken: mapboxgl.accessToken });
 
@@ -429,7 +438,7 @@ const showRouteToNextDestination = useCallback(async () => {
       mapInstance.current.getSource("current-to-destination").setData(geojson);
     } else {
       // Add new source + layers
-      mapInstance.current.addSource("current-to-destination", {
+      safeAddSource(mapInstance.current, "current-to-destination", {
         type: "geojson",
         data: geojson,
       });
@@ -660,7 +669,7 @@ const showRouteToDropoffFromCurrentLocation = async () => {
       geometry: route.geometry,
     };
 
-    mapInstance.current.addSource("current-to-destination", {
+    safeAddSource(mapInstance.current, "current-to-destination", {
       type: "geojson",
       data: geojson,
     });
@@ -757,7 +766,7 @@ setDropoffStarted(false); // RESET to allow next button
     if (mapInstance.current.getSource("current-to-destination")) {
       mapInstance.current.getSource("current-to-destination").setData(geojson);
     } else {
-      mapInstance.current.addSource("current-to-destination", {
+      safeAddSource(mapInstance.current, "current-to-destination", {
         type: "geojson",
         data: geojson,
       });
@@ -828,14 +837,14 @@ const updateCurrentToPickupRoute = useCallback(async () => {
     if (map.getSource("current-to-pickup")) {
       map.getSource("current-to-pickup").setData(geojson);
     } else {
-      map.addSource("current-to-pickup", {
+      safeAddSource(mapInstance.current, "current-to-pickup", {
         type: "geojson",
         data: geojson,
       });
 
       // Add stroke line first (darker blue outline)
       if (!map.getLayer("current-to-pickup-stroke")) {
-        map.addLayer(
+        safeAddLayer(mapInstance.current,
           {
             id: "current-to-pickup-stroke",
             type: "line",
@@ -856,7 +865,7 @@ const updateCurrentToPickupRoute = useCallback(async () => {
 
       // Add inner bright blue line
       if (!map.getLayer("current-to-pickup-line")) {
-        map.addLayer(
+        safeAddLayer(mapInstance.current,
           {
             id: "current-to-pickup-line",
             type: "line",
@@ -877,7 +886,7 @@ const updateCurrentToPickupRoute = useCallback(async () => {
 
       // Add dashed line effect
       if (!map.getLayer("current-to-pickup-dash")) {
-        map.addLayer(
+        safeAddLayer(mapInstance.current,
           {
             id: "current-to-pickup-dash",
             type: "line",
@@ -958,7 +967,7 @@ const handlePickupToDropoff = useCallback(async () => {
     if (mapInstance.current.getSource("current-to-destination")) {
       mapInstance.current.getSource("current-to-destination").setData(geojson);
     } else {
-      mapInstance.current.addSource("current-to-destination", {
+      safeAddSource(mapInstance.current, "current-to-destination", {
         type: "geojson",
         data: geojson,
       });
@@ -1046,7 +1055,7 @@ const handleMidwayToDropoff = useCallback(async () => {
       geometry: route.geometry,
     };
 
-    mapInstance.current.addSource("current-to-destination", {
+    safeAddSource(mapInstance.current, "current-to-destination", {
       type: "geojson",
       data: geojson,
     });
@@ -1189,14 +1198,14 @@ const fetchDirections = useCallback(() => {
             if (map.getSource("current-to-pickup")) {
               map.getSource("current-to-pickup").setData(geojson);
             } else {
-              map.addSource("current-to-pickup", {
+              safeAddSource(mapInstance.current, "current-to-pickup", {
                 type: "geojson",
                 data: geojson,
               });
 
               // ✅ Add stroke line first (darker blue outline)
               if (!map.getLayer("current-to-pickup-stroke")) {
-                map.addLayer(
+                safeAddLayer(mapInstance.current,
                   {
                     id: "current-to-pickup-stroke",
                     type: "line",
@@ -1217,7 +1226,7 @@ const fetchDirections = useCallback(() => {
 
               // ✅ Then add inner bright blue line
               if (!map.getLayer("current-to-pickup-line")) {
-                map.addLayer(
+                safeAddLayer(mapInstance.current,
                   {
                     id: "current-to-pickup-line",
                     type: "line",
@@ -1238,7 +1247,7 @@ const fetchDirections = useCallback(() => {
 
               // ✅ Add dashed line effect for better visibility
               if (!map.getLayer("current-to-pickup-dash")) {
-                map.addLayer(
+                safeAddLayer(mapInstance.current,
                   {
                     id: "current-to-pickup-dash",
                     type: "line",
@@ -1789,7 +1798,7 @@ useEffect(() => {
           ],
         });
       } else {
-        map.addSource("driver", {
+        safeAddSource(mapInstance.current, "driver", {
           type: "geojson",
           data: {
             type: "FeatureCollection",
@@ -1803,7 +1812,7 @@ useEffect(() => {
           },
         });
 
-        map.addLayer({
+        safeAddLayer(mapInstance.current,{
           id: "driver-layer",
           type: "symbol",
           source: "driver",
