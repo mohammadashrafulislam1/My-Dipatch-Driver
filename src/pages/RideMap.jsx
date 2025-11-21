@@ -2104,11 +2104,9 @@ useEffect(() => {
       </div>
 
       {/* BOTTOM NAVIGATION BAR (MATCHING DESIGN) */}
-      <div className="absolute bottom-0 w-full z-20 px-3 md:px-10">
-  <div className={`flex items-center justify-between w-full p-4 rounded-xl shadow-2xl 
+      <div className="absolute md:bottom-0 bottom-4 w-full z-20 px-3 md:px-10">
+  <div className={`flex flex-col md:flex-row gap-2 items-center justify-between w-full p-4 rounded-xl shadow-2xl 
     ${isDarkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-900"}`}>
-
-          <button className={`p-2 rounded-full text-2xl ${isDarkMode ? "text-white" : "text-gray-900"}`}>⋮</button>
 
           <div className="flex-1 flex justify-center items-center">
             {journeyStarted ? (
@@ -2249,9 +2247,9 @@ setShowMainRoute(false);
   </p>
 )}
 
-          <button onClick={handleChatWithCustomer} className={`ml-3 py-3 flex items-center justify-center gap-3 rounded-xl px-3 text-2xl 
+          <button onClick={handleChatWithCustomer} className={`ml-3 py-3 flex items-center justify-center md:gap-3 gap-1 rounded-xl px-3 md:text-2xl text-[13px]
             ${isDarkMode ? "text-white bg-black" : "text-gray-900 bg-white"}`} title="Chat with customer">
-            <p className="!text-[18px] font-semibold">Chat With Customer</p>
+            <p className="md:!text-[18px] !text-[12px] font-semibold">Chat With Customer</p>
             <FaComments />
           </button>
         </div>
