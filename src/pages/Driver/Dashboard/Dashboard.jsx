@@ -27,14 +27,7 @@ import { TfiAlignLeft } from "react-icons/tfi";
 import { VscSignOut } from "react-icons/vsc";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import useAuth from "../../../Components/useAuth";
-
-const notifications = [
-  { id: 1, text: "You have a new message from Alex.", timeAgo: "2h ago" },
-  { id: 2, text: "New comment on your post.", timeAgo: "3h ago" },
-  { id: 3, text: "System update completed.", timeAgo: "6h ago" },
-  { id: 4, text: "Your password was changed.", timeAgo: "Yesterday" },
-  { id: 5, text: "Weekly summary is ready.", timeAgo: "2 days ago" },
-];
+import NotificationComp from "../../../Components/Notifications";
 
 
 const messages = [
@@ -280,15 +273,7 @@ const Dashboard = () => {
     </div>
 
     <ul className="max-h-64 overflow-y-auto">
-      {notifications.slice(0, 5).map((note) => (
-        <li key={note.id} className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 cursor-pointer border-b">
-          <div className="h-2 w-2 mt-2 rounded-full bg-blue-500 shrink-0"></div>
-          <div className="text-sm text-gray-700 leading-tight">
-            <p>{note.text}</p>
-            <span className="text-xs text-gray-400">{note.timeAgo || "Just now"}</span>
-          </div>
-        </li>
-      ))}
+      <NotificationComp />
     </ul>
 
     <button
