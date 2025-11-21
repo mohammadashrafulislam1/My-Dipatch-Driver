@@ -1,92 +1,95 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { DateRange } from "react-date-range";
-import { format, isWithinInterval, parse } from "date-fns";
+import { format, isWithinInterval } from "date-fns";
 import { FaDollarSign, FaCar, FaClock } from "react-icons/fa";
 import { IoChevronDown } from "react-icons/io5";
+import useAuth from "../../../Components/useAuth";
+import axios from "axios";
+import { endPoint } from "../../../Components/ForAPIs";
 
 import "react-date-range/dist/styles.css";
 import "react-date-range/dist/theme/default.css";
 
-const allTrips = [
-  {
-    date: "2025-06-05",
-    from: "Downtown",
-    to: "Airport",
-    fare: 25.0,
-    distance: 12,
-    duration: 30, // in minutes
-  },
-  {
-    date: "2025-06-18",
-    from: "Station",
-    to: "Mall",
-    fare: 16.8,
-    distance: 7.4,
-    duration: 20,
-  },
-  {
-    date: "2025-07-05",
-    from: "Park Ave",
-    to: "University",
-    fare: 12.5,
-    distance: 5.3,
-    duration: 18,
-  },
-  {
-    date: "2025-07-22",
-    from: "Central Park",
-    to: "Tech Hub",
-    fare: 19.6,
-    distance: 9.1,
-    duration: 25,
-  },
-];
-
 const Earnings = () => {
+  const { user } = useAuth();
+
   const [range, setRange] = useState([
     {
-      startDate: new Date("2025-06-02"),
-      endDate: new Date("2025-07-20"),
+      // Default: show ALL rides
+      startDate: new Date("2025-01-01"),
+      endDate: new Date("2026-12-31"),
       key: "selection",
     },
   ]);
-  const [showCalendar, setShowCalendar] = useState(false);
 
-  const toggleCalendar = () => setShowCalendar((prev) => !prev);
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [completedRides, setCompletedRides] = useState([]);
+
+  // 🔥 Fetch COMPLETED rides
+  useEffect(() => {
+    if (!user?._id) return;
+
+    const fetchOrders = async () => {
+      try {
+        const res = await axios.get(`${endPoint}/rides`);
+        const orders = res.data.rides || [];
+
+        // Filter only completed rides for this driver
+        const myCompleted = orders.filter(
+          (order) =>
+            order.driverId === user._id &&
+            order.status === "completed"
+        );
+
+        console.log("Completed Rides:", myCompleted);
+        setCompletedRides(myCompleted);
+      } catch (error) {
+        console.log("Error loading earnings:", error);
+      }
+    };
+
+    fetchOrders();
+  }, [user]);
 
   const formattedRange = `${format(range[0].startDate, "MMM d, yyyy")} - ${format(
     range[0].endDate,
     "MMM d, yyyy"
   )}`;
 
-  // Filter trips based on selected range
+  // 🔥 Filter rides within selected date range
   const filteredTrips = useMemo(() => {
-    return allTrips.filter((trip) =>
-      isWithinInterval(new Date(trip.date), {
+    return completedRides.filter((ride) =>
+      isWithinInterval(new Date(ride.updatedAt), {
         start: range[0].startDate,
-        end: range[0].endDate,
+        // FIX: include entire day (endDate + 1 day)
+        end: new Date(range[0].endDate.getTime() + 86400000),
       })
     );
-  }, [range]);
+  }, [range, completedRides]);
 
-  // Calculate earnings summary
-  const totalEarnings = filteredTrips.reduce((sum, t) => sum + t.fare, 0).toFixed(2);
+  // 🔥 Calculate earnings
+  const totalEarnings = filteredTrips
+    .reduce((sum, r) => sum + Number(r.price || 0), 0)
+    .toFixed(2);
+
   const totalRides = filteredTrips.length;
-  const totalMinutes = filteredTrips.reduce((sum, t) => sum + t.duration, 0);
+
+  // TEMP: estimate hours (replace later with real online tracking)
+  const totalMinutes = totalRides * 20;
   const totalHours = Math.round(totalMinutes / 60);
 
   return (
     <div className="p-6 mt-5 bg-gray-100 min-h-screen rounded-2xl relative">
-      {/* Header and Calendar Toggle */}
+
+      {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800 mb-4 md:mb-0">
           Earnings Dashboard
         </h1>
 
-        {/* Date and Year */}
         <div className="pt-2 relative overflow-visible">
           <button
-            onClick={toggleCalendar}
+            onClick={() => setShowCalendar((p) => !p)}
             className="flex items-center gap-2 text-gray-700 text-sm font-medium border px-3 py-2 rounded-md shadow-sm bg-white hover:bg-gray-50"
           >
             <span>{formattedRange}</span>
@@ -129,44 +132,43 @@ const Earnings = () => {
         />
       </div>
 
-      {/* Recent Trips Table */}
+      {/* Recent Trips */}
       <div className="bg-white shadow-xl rounded-2xl overflow-x-auto">
         <table className="min-w-full table-auto">
           <thead className="bg-gray-200 text-gray-700 text-sm uppercase">
             <tr>
               <th className="px-6 py-4 text-left">Date</th>
-              <th className="px-6 py-4 text-left">From</th>
-              <th className="px-6 py-4 text-left">To</th>
+              <th className="px-6 py-4 text-left">Pickup</th>
+              <th className="px-6 py-4 text-left">Dropoff</th>
               <th className="px-6 py-4 text-left">Fare</th>
               <th className="px-6 py-4 text-left">Distance</th>
             </tr>
           </thead>
+
           <tbody className="text-gray-700">
             {filteredTrips.length > 0 ? (
-              filteredTrips.map((trip, index) => (
-                <tr
-                  key={index}
-                  className="border-t hover:bg-gray-100 transition"
-                >
+              filteredTrips.map((ride, index) => (
+                <tr key={index} className="border-t hover:bg-gray-100 transition">
                   <td className="px-6 py-4">
-                    {format(new Date(trip.date), "MMM d, yyyy")}
+                    {format(new Date(ride.updatedAt), "MMM d, yyyy")}
                   </td>
-                  <td className="px-6 py-4">{trip.from}</td>
-                  <td className="px-6 py-4">{trip.to}</td>
-                  <td className="px-6 py-4">${trip.fare.toFixed(2)}</td>
-                  <td className="px-6 py-4">{trip.distance} km</td>
+                  <td className="px-6 py-4">{ride.pickup?.address}</td>
+                  <td className="px-6 py-4">{ride.dropoff?.address}</td>
+                  <td className="px-6 py-4">${ride.price}</td>
+                  <td className="px-6 py-4">{ride.distance}</td>
                 </tr>
               ))
             ) : (
               <tr>
                 <td colSpan="5" className="text-center py-6 text-gray-400">
-                  No trips in selected date range.
+                  No completed rides in this date range.
                 </td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
+
     </div>
   );
 };

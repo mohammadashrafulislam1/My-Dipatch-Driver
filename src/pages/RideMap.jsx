@@ -2095,9 +2095,10 @@ useEffect(() => {
       </div>
 
       {/* BOTTOM NAVIGATION BAR (MATCHING DESIGN) */}
-      <div className={`absolute flex gap-24 flex-row-reverse bottom-0 w-full shadow-2xl z-10 md:px-10 px-3`}>
+      <div className="absolute bottom-0 w-full z-20 px-3 md:px-10">
+  <div className={`flex items-center justify-between w-full p-4 rounded-xl shadow-2xl 
+    ${isDarkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-900"}`}>
 
-        <div className={`flex items-center w-full p-5 rounded-xl justify-between h-full ${isDarkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-900"}`}>
           <button className={`p-2 rounded-full text-2xl ${isDarkMode ? "text-white" : "text-gray-900"}`}>⋮</button>
 
           <div className="flex-1 flex justify-center items-center">
