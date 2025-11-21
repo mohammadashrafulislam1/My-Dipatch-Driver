@@ -1,71 +1,120 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DateRange } from "react-date-range";
 import { format } from "date-fns";
 import { IoChevronDown } from "react-icons/io5";
 import "react-date-range/dist/styles.css";
 import "react-date-range/dist/theme/default.css";
 
-const transactions = [
-  {
-    id: 1,
-    type: "Ride #3257",
-    method: "Cash",
-    amount: 12.8,
-    date: new Date("2025-06-30"),
-  },
-  {
-    id: 2,
-    type: "Ride #3253",
-    method: "Card",
-    amount: 18.2,
-    date: new Date("2025-06-29"),
-  },
-  {
-    id: 3,
-    type: "Withdrawal",
-    method: "",
-    amount: -100,
-    date: new Date("2025-06-28"),
-  },
-  {
-    id: 4,
-    type: "Ride #3248",
-    method: "Cash",
-    amount: 22.5,
-    date: new Date("2025-06-28"),
-  },
-];
+import axios from "axios";
+import toast from "react-hot-toast";
+import { endPoint } from "../../../Components/ForAPIs";
+import useAuth from "../../../Components/useAuth";
 
 const Wallet = () => {
+  const { user, token } = useAuth();
+
   const [showCalendar, setShowCalendar] = useState(false);
+
+  // Date range: last 30 days → today
   const [range, setRange] = useState([
     {
-      startDate: new Date("2025-06-28"),
-      endDate: new Date("2025-06-30"),
+      startDate: new Date(new Date().setDate(new Date().getDate() - 30)),
+      endDate: new Date(),
       key: "selection",
     },
   ]);
 
-  const formattedRange = `${format(range[0].startDate, "dd MMMM yyyy")} - ${format(
+  const formattedRange = `${format(range[0].startDate, "dd MMM yyyy")} - ${format(
     range[0].endDate,
-    "dd MMMM yyyy"
+    "dd MMM yyyy"
   )}`;
-  const toggleCalendar = () => {
-    setShowCalendar((prev) => !prev);
-  };
 
+  const [transactions, setTransactions] = useState([]);
+  const [totalEarnings, setTotalEarnings] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [totalWithdraw, setTotalWithdraw] = useState(0); // future expansion
+
+  // Fetch all driver rides
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchWalletData = async () => {
+      try {
+        // Get ride history
+        const rideRes = await axios.get(
+          `${endPoint}/rides/driver/${user?._id || user.id}/history`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+
+        const rides = rideRes.data.rides || [];
+
+        // Convert rides into transaction format
+        const rideTransactions = rides
+          .filter((r) => r.status === "completed")
+          .map((r) => ({
+            id: r._id,
+            type: `Ride #${r._id.slice(-4)}`,
+            method: "Cash", // or from DB: r.paymentMethod ?
+            amount: Number(r.price),
+            date: new Date(r.createdAt),
+          }));
+
+        // GET total earnings from backend
+        const earningsRes = await axios.get(
+          `${endPoint}/rides/driver/${user?._id || user.id}/earnings`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+
+        setTotalEarnings(earningsRes.data.totalEarnings || 0);
+        setTransactions(rideTransactions);
+
+        // withdrawals (if future DB added)
+        setTotalWithdraw(0);
+      } catch (err) {
+        console.error(err);
+        toast.error("Failed to load wallet data");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchWalletData();
+  }, [user]);
+
+  // Filter transactions by selected range
   const filteredTransactions = transactions.filter((t) => {
     const { startDate, endDate } = range[0];
     return t.date >= startDate && t.date <= endDate;
   });
 
+  // Daily & weekly earnings
+  const today = new Date().toDateString();
+  const todayEarnings = transactions
+    .filter((t) => t.date.toDateString() === today)
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const oneWeekAgo = new Date();
+  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+  const weeklyEarnings = transactions
+    .filter((t) => t.date >= oneWeekAgo)
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const toggleCalendar = () => setShowCalendar((prev) => !prev);
+
   return (
-    <div className="md:max-w-3xl mx-auto p-4 space-y-6 relative  md:mt-0 mt-6">
+    <div className="md:max-w-3xl mx-auto p-4 space-y-6 relative md:mt-0 mt-6">
       {/* Driver Balance */}
       <div className="bg-blue-600 text-white p-6 rounded-xl shadow-md">
         <div className="text-sm">Total Earnings</div>
-        <div className="text-3xl font-bold mt-1">$4,120.75</div>
-        <div className="text-xs text-blue-100 mt-1">Updated 1 hour ago</div>
+        <div className="text-3xl font-bold mt-1">
+          {loading ? "..." : `$${totalEarnings.toFixed(2)}`}
+        </div>
+        <div className="text-xs text-blue-100 mt-1">Updated just now</div>
       </div>
 
       {/* Withdraw Button */}
@@ -79,25 +128,35 @@ const Wallet = () => {
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-gray-100 p-4 rounded-lg shadow-sm">
           <div className="text-sm text-gray-500">Today's Earnings</div>
-          <div className="text-xl font-semibold">$85.40</div>
+          <div className="text-xl font-semibold">
+            ${todayEarnings.toFixed(2)}
+          </div>
         </div>
+
         <div className="bg-gray-100 p-4 rounded-lg shadow-sm">
           <div className="text-sm text-gray-500">This Week</div>
-          <div className="text-xl font-semibold">$412.75</div>
+          <div className="text-xl font-semibold">
+            ${weeklyEarnings.toFixed(2)}
+          </div>
         </div>
+
         <div className="bg-gray-100 p-4 rounded-lg shadow-sm">
           <div className="text-sm text-gray-500">Total Earning</div>
-          <div className="text-xl font-semibold">$4120.75</div>
+          <div className="text-xl font-semibold">
+            ${totalEarnings.toFixed(2)}
+          </div>
         </div>
+
         <div className="bg-gray-100 p-4 rounded-lg shadow-sm">
           <div className="text-sm text-gray-500">Total Withdraw</div>
-          <div className="text-xl font-semibold text-red-500">– $1100.75</div>
+          <div className="text-xl font-semibold text-red-500">
+            – ${totalWithdraw.toFixed(2)}
+          </div>
         </div>
       </div>
 
-      {/* Date Range Filter (styled) */}
+      {/* Date Range Filter */}
       <div className="pt-2 relative overflow-visible">
-        {/* Header */}
         <button
           onClick={toggleCalendar}
           className="flex items-center gap-2 text-gray-700 text-sm font-medium"
@@ -106,15 +165,11 @@ const Wallet = () => {
           <IoChevronDown className="text-base" />
         </button>
 
-        {/* Calendar Dropdown */}
         {showCalendar && (
           <div className="absolute mt-2 md:right-0 right-0 z-30 bg-white shadow-lg rounded-md md:p-2">
             <DateRange
               editableDateInputs={true}
-              onChange={(item) => {
-                console.log("DateRange onChange", item);
-                setRange([item.selection]);
-              }}
+              onChange={(item) => setRange([item.selection])}
               moveRangeOnFirstSelection={false}
               ranges={range}
               rangeColors={["#006FFF"]}
@@ -128,6 +183,7 @@ const Wallet = () => {
         {filteredTransactions.length === 0 && (
           <div className="text-gray-500">No transactions found.</div>
         )}
+
         {filteredTransactions.map((t) => (
           <li
             key={t.id}
@@ -139,6 +195,7 @@ const Wallet = () => {
                 {t.date.toDateString()} {t.method && `· ${t.method}`}
               </div>
             </div>
+
             <div
               className={`font-semibold ${
                 t.amount > 0 ? "text-green-600" : "text-red-500"
