@@ -12,10 +12,10 @@ import "react-date-range/dist/theme/default.css";
 
 const Earnings = () => {
   const { user } = useAuth();
+console.log("USER FROM AUTH:", user);
 
   const [range, setRange] = useState([
     {
-      // Default: show ALL rides
       startDate: new Date("2025-01-01"),
       endDate: new Date("2026-12-31"),
       key: "selection",
@@ -36,9 +36,7 @@ const Earnings = () => {
 
         // Filter only completed rides for this driver
         const myCompleted = orders.filter(
-          (order) =>
-            order.driverId === user._id &&
-            order.status === "completed"
+          (order) => order.driverId === user._id && order.status === "completed"
         );
 
         console.log("Completed Rides:", myCompleted);
@@ -51,17 +49,16 @@ const Earnings = () => {
     fetchOrders();
   }, [user]);
 
-  const formattedRange = `${format(range[0].startDate, "MMM d, yyyy")} - ${format(
-    range[0].endDate,
+  const formattedRange = `${format(
+    range[0].startDate,
     "MMM d, yyyy"
-  )}`;
+  )} - ${format(range[0].endDate, "MMM d, yyyy")}`;
 
   // 🔥 Filter rides within selected date range
   const filteredTrips = useMemo(() => {
     return completedRides.filter((ride) =>
       isWithinInterval(new Date(ride.updatedAt), {
         start: range[0].startDate,
-        // FIX: include entire day (endDate + 1 day)
         end: new Date(range[0].endDate.getTime() + 86400000),
       })
     );
@@ -72,15 +69,32 @@ const Earnings = () => {
     .reduce((sum, r) => sum + Number(r.price || 0), 0)
     .toFixed(2);
 
+  // 🛑 Fix: Calculate Hours Online using timestamps
+const calculateHoursOnline = (timestamps) => {
+  if (!timestamps?.acceptedAt || !timestamps?.dropoffAt) return 0;
+
+  const start = new Date(timestamps.acceptedAt).getTime();
+  const end = new Date(timestamps.dropoffAt).getTime();
+
+  if (!end || end < start) return 0;
+
+  const diffMs = end - start;
+  const hours = diffMs / (1000 * 60 * 60);
+
+  return Number(hours.toFixed(2));
+};
+
+
+  // Total Rides
   const totalRides = filteredTrips.length;
 
-  // TEMP: estimate hours (replace later with real online tracking)
-  const totalMinutes = totalRides * 20;
-  const totalHours = Math.round(totalMinutes / 60);
+  // Total Hours Online
+  const totalHours = filteredTrips
+    .reduce((sum, ride) => sum + calculateHoursOnline(ride.timestamps), 0)
+    .toFixed(2);
 
   return (
     <div className="p-6 mt-5 bg-gray-100 min-h-screen rounded-2xl relative">
-
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800 mb-4 md:mb-0">
@@ -148,7 +162,10 @@ const Earnings = () => {
           <tbody className="text-gray-700">
             {filteredTrips.length > 0 ? (
               filteredTrips.map((ride, index) => (
-                <tr key={index} className="border-t hover:bg-gray-100 transition">
+                <tr
+                  key={index}
+                  className="border-t hover:bg-gray-100 transition"
+                >
                   <td className="px-6 py-4">
                     {format(new Date(ride.updatedAt), "MMM d, yyyy")}
                   </td>
@@ -160,7 +177,10 @@ const Earnings = () => {
               ))
             ) : (
               <tr>
-                <td colSpan="5" className="text-center py-6 text-gray-400">
+                <td
+                  colSpan="5"
+                  className="text-center py-6 text-gray-400"
+                >
                   No completed rides in this date range.
                 </td>
               </tr>
@@ -168,7 +188,6 @@ const Earnings = () => {
           </tbody>
         </table>
       </div>
-
     </div>
   );
 };
