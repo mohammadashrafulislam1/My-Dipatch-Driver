@@ -12,7 +12,8 @@ import useAuth from "../../../Components/useAuth";
 
 const Wallet = () => {
   const { user, token } = useAuth();
-
+const [showWithdraw, setShowWithdraw] = useState(false);
+const [withdrawAmount, setWithdrawAmount] = useState("");
   const [showCalendar, setShowCalendar] = useState(false);
 
   // Date range: last 30 days → today
@@ -106,6 +107,41 @@ const Wallet = () => {
 
   const toggleCalendar = () => setShowCalendar((prev) => !prev);
 
+  const handleWithdraw = async () => {
+  if (!withdrawAmount || Number(withdrawAmount) <= 0) {
+    toast.error("Enter valid amount");
+    return;
+  }
+
+  if (Number(withdrawAmount) > totalEarnings) {
+    toast.error("You don't have enough balance");
+    return;
+  }
+
+  try {
+    // Example — You will replace with your real withdraw API
+    const res = await axios.post(
+      `${endPoint}/wallet/withdraw`,
+      {
+        driverId: user.id,
+        amount: Number(withdrawAmount),
+      },
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+
+    toast.success("Withdrawal request sent!");
+    setShowWithdraw(false);
+    setWithdrawAmount("");
+
+  } catch (err) {
+    console.error(err);
+    toast.error("Withdrawal failed, try again");
+  }
+};
+
+
   return (
     <div className="md:max-w-3xl mx-auto p-4 space-y-6 relative md:mt-0 mt-6">
       {/* Driver Balance */}
@@ -119,10 +155,56 @@ const Wallet = () => {
 
       {/* Withdraw Button */}
       <div className="flex justify-end">
-        <button className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-xl font-semibold shadow">
-          Withdraw to Bank
+  <button
+    onClick={() => setShowWithdraw(true)}
+    className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-xl font-semibold shadow"
+  >
+    Withdraw to Bank
+  </button>
+</div>
+
+{showWithdraw && (
+  <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+    <div className="bg-white p-6 rounded-xl shadow-lg w-[90%] max-w-md">
+      <h2 className="text-xl font-semibold mb-4">Withdraw Funds</h2>
+
+      <label className="block text-sm text-gray-600 mb-1">Amount</label>
+
+      <input
+        type="number"
+        value={withdrawAmount}
+        onChange={(e) => setWithdrawAmount(e.target.value)}
+        className="w-full border px-3 py-2 rounded-lg outline-none focus:ring-2 focus:ring-green-500"
+        placeholder="Enter amount to withdraw"
+      />
+
+      {/* 🔥 Add FULL BALANCE button */}
+      <button
+        onClick={() => setWithdrawAmount(totalEarnings.toFixed(2))}
+        className="text-blue-600 text-sm underline mt-2 mb-4"
+      >
+        Withdraw Full Amount (${totalEarnings.toFixed(2)})
+      </button>
+
+      <div className="flex justify-end gap-2">
+        <button
+          onClick={() => setShowWithdraw(false)}
+          className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
+        >
+          Cancel
+        </button>
+
+        <button
+          onClick={handleWithdraw}
+          className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+        >
+          Confirm
         </button>
       </div>
+    </div>
+  </div>
+)}
+
 
       {/* Earnings Summary */}
       <div className="grid grid-cols-2 gap-4">
