@@ -7,21 +7,22 @@ export const AuthContext = createContext();
 
 const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
+  const [token, setToken] = useState(localStorage.getItem("driverToken") || null);
   const [loading, setLoading] = useState(true);
 
-  // 🔐 Attach token automatically to every request
+  // 🔐 Attach token to every axios request automatically
   axios.interceptors.request.use((config) => {
-    const driverToken = localStorage.getItem("driverToken");
-    if (driverToken) {
-      config.headers.Authorization = `Bearer ${driverToken}`;
+    const savedToken = localStorage.getItem("driverToken");
+    if (savedToken) {
+      config.headers.Authorization = `Bearer ${savedToken}`;
     }
     return config;
   });
 
-  // ✅ Fetch current user from backend using the token
+  // ✅ Load current user using token
   const fetchCurrentUser = async () => {
-    const driverToken = localStorage.getItem("driverToken");
-    if (!driverToken) {
+    const savedToken = localStorage.getItem("driverToken");
+    if (!savedToken) {
       setUser(null);
       setLoading(false);
       return;
@@ -30,10 +31,12 @@ const AuthProvider = ({ children }) => {
     try {
       const { data } = await axios.get(`${endPoint}/user/me/driver`);
       setUser(data.user);
+      setToken(savedToken); // 🔥 super important
     } catch (err) {
-      console.error("Fetch current user error:", err.response?.data || err.message);
+      console.error("Fetch user error:", err.response?.data || err.message);
       localStorage.removeItem("driverToken");
       setUser(null);
+      setToken(null);
     } finally {
       setLoading(false);
     }
@@ -43,14 +46,13 @@ const AuthProvider = ({ children }) => {
     fetchCurrentUser();
   }, []);
 
-  // 🧾 Signup (no token saved)
+  // 🧾 Signup
   const signup = async (formData) => {
     setLoading(true);
     try {
       const { data } = await axios.post(`${endPoint}/user/signup`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-      // ✅ Only create user, don’t auto-login
       return data;
     } catch (err) {
       console.error("Signup error:", err.response?.data || err.message);
@@ -65,8 +67,11 @@ const AuthProvider = ({ children }) => {
     setLoading(true);
     try {
       const { data } = await axios.post(`${endPoint}/user/login`, formData);
+
       localStorage.setItem("driverToken", data.token);
-      setUser(data.user);
+      setToken(data.token);     // 🔥 store token in state
+      setUser(data.user);       // 🔥 store user in state
+
       return data;
     } catch (err) {
       console.error("Login error:", err.response?.data || err.message);
@@ -75,16 +80,25 @@ const AuthProvider = ({ children }) => {
       setLoading(false);
     }
   };
- if(loading){
-  <LoadingScreen/>
- }
+
   // 🚪 Logout
-  const logout = async () => {
+  const logout = () => {
     localStorage.removeItem("driverToken");
     setUser(null);
+    setToken(null);
   };
 
-  const authInfo = { user, loading, signup, login, logout, fetchCurrentUser };
+  if (loading) return <LoadingScreen />;
+
+  const authInfo = {
+    user,
+    token,                 // 🔥 Now token is available in every component
+    loading,
+    signup,
+    login,
+    logout,
+    fetchCurrentUser,
+  };
 
   return <AuthContext.Provider value={authInfo}>{children}</AuthContext.Provider>;
 };

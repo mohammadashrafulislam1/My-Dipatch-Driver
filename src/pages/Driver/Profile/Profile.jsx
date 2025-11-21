@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { FiEye, FiEyeOff } from 'react-icons/fi';
+import useAuth from '../../../Components/useAuth';
 
 const Profile = () => {
   const [showModal, setShowModal] = useState(false);
@@ -9,6 +10,7 @@ const Profile = () => {
     new: false,
     confirm: false,
   });
+  const {user, loading, logout} = useAuth();
 
   return (
     <div className="max-w-md mx-auto p-6 bg-white shadow-lg rounded-2xl mt-8">
@@ -18,7 +20,7 @@ const Profile = () => {
       <div className="flex justify-center mb-6">
         <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-blue-600 shadow-md">
           <img
-            src="https://i.pravatar.cc/150?img=3"
+            src={user?.profileImage}
             alt="Profile"
             className="w-full h-full object-cover"
           />
@@ -29,15 +31,15 @@ const Profile = () => {
       <div className="space-y-4">
         <div>
           <label className="text-sm text-gray-500">Name</label>
-          <p className="text-lg text-gray-800 font-medium">John Doe</p>
+          <p className="text-lg text-gray-800 font-medium">{user?.firstName}{user?.lastName}</p>
         </div>
         <div>
           <label className="text-sm text-gray-500">Phone Number</label>
-          <p className="text-lg text-gray-800 font-medium">+1 (123) 456-7890</p>
+          <p className="text-lg text-gray-800 font-medium">{user?.phone}</p>
         </div>
         <div>
           <label className="text-sm text-gray-500">Email</label>
-          <p className="text-lg text-gray-800 font-medium">johndoe@example.com</p>
+          <p className="text-lg text-gray-800 font-medium">{user?.email}</p>
         </div>
       </div>
 

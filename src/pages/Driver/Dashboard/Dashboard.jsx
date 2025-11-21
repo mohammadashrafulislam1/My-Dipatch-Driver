@@ -417,7 +417,7 @@ const Dashboard = () => {
            </div>
             <div className="divider lg:divider-horizontal mx-0 my-0 block md:hidden"></div>
             <div className="md:flex items-center gap-2 hidden">
-              <span className="text-sm font-medium">{user?.firstName}{user?.lastName}</span>
+              <span className="text-sm font-medium">{user?.firstName} {user?.lastName}</span>
               <div className="avatar avatar-online w-10 h-10">
                 <img
                   src={user?.profileImage}
@@ -429,7 +429,7 @@ const Dashboard = () => {
           </div>
         </div>
         <div className="flex items-center gap-2 md:hidden mt-3 pl-5">
-              <span className="text-sm font-medium">{user?.firstName}{user?.lastName}</span>
+              <span className="text-sm font-medium">{user?.firstName} {user?.lastName}</span>
               <div className="avatar avatar-online w-10 h-10">
                 <img
                   src={user?.profileImage}
