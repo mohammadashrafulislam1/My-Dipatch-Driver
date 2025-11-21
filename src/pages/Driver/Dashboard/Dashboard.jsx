@@ -53,6 +53,8 @@ const Dashboard = () => {
   const [showDropdown, setShowDropdown] = useState(false);
   const {user, loading, logout} = useAuth();
   
+  console.log(user)
+
   const handleLogout = async () => {
     try {
       await logout();          // Call your existing logout function
@@ -415,11 +417,11 @@ const Dashboard = () => {
            </div>
             <div className="divider lg:divider-horizontal mx-0 my-0 block md:hidden"></div>
             <div className="md:flex items-center gap-2 hidden">
-              <span className="text-sm font-medium">John Doe</span>
-              <div className="avatar avatar-online">
+              <span className="text-sm font-medium">{user?.firstName}{user?.lastName}</span>
+              <div className="avatar avatar-online w-10 h-10">
                 <img
-                  src="https://i.pravatar.cc/40"
-                  alt="avatar"
+                  src={user?.profileImage}
+                  alt="profileImage - avatar"
                   className="w-8 h-8 rounded-full "
                 />
               </div>
@@ -427,11 +429,11 @@ const Dashboard = () => {
           </div>
         </div>
         <div className="flex items-center gap-2 md:hidden mt-3 pl-5">
-              <span className="text-sm font-medium">John Doe</span>
-              <div className="avatar avatar-online">
+              <span className="text-sm font-medium">{user?.firstName}{user?.lastName}</span>
+              <div className="avatar avatar-online w-10 h-10">
                 <img
-                  src="https://i.pravatar.cc/40"
-                  alt="avatar"
+                  src={user?.profileImage}
+                  alt="profileImage - avatar"
                   className="w-8 h-8 rounded-full "
                 />
               </div>
