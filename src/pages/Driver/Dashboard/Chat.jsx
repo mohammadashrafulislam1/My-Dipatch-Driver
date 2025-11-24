@@ -19,7 +19,7 @@ const Chat = () => {
   const [rideStatus, setRideStatus] = useState(null);
   const [activeRide, setActiveRide] = useState(null); 
 
-  const { user } = useAuth(); // Assume user object contains the current user's details (driver/customer)
+  const { user,token } = useAuth(); // Assume user object contains the current user's details (driver/customer)
 
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -118,8 +118,11 @@ useEffect(() => {
     try {
       console.log(`Fetching chat history for ride: ${rideIdToUse}`);
       const res = await axios.get(`${endPoint}/chat/driver/${rideIdToUse}`, {
-        withCredentials: true,
-      });
+  headers: {
+    Authorization: `Bearer ${token}`,
+  },
+});
+ console.log(res)
       const history = res.data.messages || [];
 
       // ✅ Format messages
@@ -206,7 +209,6 @@ useEffect(() => {
         };
         setUsers([chatUser]);
 
-        if (!selectedUser) setSelectedUser(chatUser);
       } else {
         setUsers([]);
       }
@@ -218,6 +220,38 @@ useEffect(() => {
 
   fetchRideAndUser();
 }, [endPoint, user?._id, rideIdFromQuery, userIdFromQuery, selectedUser]);
+console.log("📥 Fetching chat history for:", selectedUser?.id);
+
+// ✅ Restore chat after reload (FINAL FIX)
+useEffect(() => {
+  if (!user?._id) return;
+  if (users.length === 0) return;
+
+  // If already selected, do nothing
+  if (selectedUser) return;
+
+  const u = users[0];
+
+  // Restore rideId
+  let rideIdToUse = rideIdFromQuery;
+  if (!rideIdToUse) {
+    const storedRide = localStorage.getItem("activeRide");
+    if (storedRide) {
+      try {
+        rideIdToUse = JSON.parse(storedRide)._id;
+      } catch {}
+    }
+  }
+
+  // Set the selected user
+  setSelectedUser(u);
+
+  // Update URL correctly (important!)
+  navigate(
+    `/dashboard/chat?user=${u.id}&rideId=${rideIdToUse}&rideStatus=${rideStatus}`,
+    { replace: true }
+  );
+}, [users, user?._id]);
 
 
   // Check if the user is selectable (i.e., if messaging is allowed)
@@ -246,7 +280,7 @@ useEffect(() => {
     
     // Data required for both text and file
     const chatData = {
-      rideId: rideIdFromQuery,
+      rideId: activeRide._id,
       senderId: user._id,
       senderRole: user.role, // Assuming user.role is "customer" or "driver"
       recipientId: selectedUser.id,

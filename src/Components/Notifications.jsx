@@ -7,15 +7,20 @@ const socket = io("https://my-dipatch-backend.onrender.com", {
   transports: ["websocket"],
 });
 
-const NotificationComp = () => {
+const NotificationComp = ({ onCountChange = () => {} }) => {
   const { user } = useAuth();
   const [notifications, setNotifications] = useState([]);
 
   const addNotif = (text) => {
-    setNotifications((prev) => [
-      { id: Date.now(), text, time: new Date().toISOString() },
-      ...prev,
-    ]);
+    setNotifications((prev) => {
+      const updated = [
+        { id: Date.now(), text, time: new Date().toISOString() },
+        ...prev,
+      ];
+      
+      onCountChange(updated.length); // 🔥 send count to Dashboard
+      return updated;
+    });
   };
 
   const timeAgo = (timeString) => {
@@ -25,6 +30,10 @@ const NotificationComp = () => {
     if (diff < 86400) return Math.floor(diff / 3600) + " hr ago";
     return Math.floor(diff / 86400) + " days ago";
   };
+  useEffect(() => {
+  onCountChange(notifications.length);
+}, [notifications]);
+
 
   useEffect(() => {
     if (!user?._id) return;

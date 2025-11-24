@@ -158,9 +158,10 @@ const hasFittedBounds = useRef(false);
 
   // Initialize directly from localStorage for dark mode
   const [isDarkMode, setIsDarkMode] = useState(() => {
-    const saved = localStorage.getItem("darkMode");
-    return saved ? saved === "true" : false;
-  });
+  const saved = localStorage.getItem("darkMode");
+  return saved ? saved === "true" : true;   // default = true
+});
+
   
   useEffect(() => {
     console.log(rideData)
@@ -705,7 +706,6 @@ const showRouteToDropoffFromCurrentLocation = async () => {
   }
 };
 
-
 //-------
 // Update the handlePickupToMidway function
 const handlePickupToMidway = useCallback(async () => {
@@ -719,6 +719,7 @@ const handlePickupToMidway = useCallback(async () => {
 setAtPickup(true);        // REQUIRED
 setDropoffStarted(false); // RESET to allow next button
           removePickupMarkerAndRoute();
+          removeDestinationRoute();
 
   try {
     // 🧹 REMOVE MAIN ROUTE FIRST
@@ -1594,6 +1595,17 @@ const removeMainRoute = () => {
 
   console.log("🧹 All old routes removed");
 };
+const removeDestinationRoute = () => {
+  const map = mapInstance.current;
+  if (!map) return;
+
+  if (map.getLayer("current-to-destination-line")) map.removeLayer("current-to-destination-line");
+  if (map.getLayer("current-to-destination-stroke")) map.removeLayer("current-to-destination-stroke");
+  if (map.getSource("current-to-destination")) map.removeSource("current-to-destination");
+
+  console.log("🧹 Destination route removed");
+};
+
 
 // 🛠️ FIX: Enhanced useEffect to handle initial route display and updates
 useEffect(() => {
@@ -1852,7 +1864,7 @@ useEffect(() => {
       });
     },
     handleGeoError,
-    { enableHighAccuracy: true, timeout: 20000, maximumAge: 10000 }
+    { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
   );
 
   return () => navigator.geolocation.clearWatch(watchId);
@@ -1983,6 +1995,7 @@ useEffect(() => {
     rideDataStatus: rideData?.status
   });
 }, [rideStatus, atPickup, dropoffStarted, journeyStarted, rideData]);
+
   // ---------- RENDER ----------
   // Show a friendly loading/placeholder state if rideData is not available yet
   if (!rideData) {
@@ -2050,7 +2063,7 @@ useEffect(() => {
       </div>
 
      {/* CAMERA CONTROLS - Bottom Right */}
-<div className="absolute bottom-32 right-4 flex flex-col space-y-2 z-20">
+<div className="absolute md:bottom-32 bottom-48 right-4 flex flex-col space-y-2 z-20">
   <button
     onClick={centerOnDriver}
     className={`p-3 text-xl rounded-xl shadow-lg ${isDarkMode ? "bg-gray-700 text-white" : "bg-white text-gray-900"}`}
@@ -2077,7 +2090,7 @@ useEffect(() => {
 </div>
 
 
-   {/* TEMPORARY RESET BUTTON - Remove after testing */}
+   {/* TEMPORARY RESET BUTTON - Remove after testing
 <button 
   onClick={() => {
     setRideStatus("accepted");
@@ -2092,16 +2105,7 @@ useEffect(() => {
   className="bg-red-500 text-white p-2 rounded absolute top-32 left-4 z-50"
 >
   Reset State
-</button>
-
-
-      {/* SPEED LIMIT - Bottom Left */}
-      <div className={`absolute bottom-32 left-4 text-center p-3 rounded-xl shadow-lg border-4 ${isDarkMode ? "border-white bg-white text-black" : "border-white bg-white text-black"}`}>
-        <p className="text-2xl font-extrabold leading-none">
-          {journeyStarted ? Math.round((remaining.distance / 1609.34) * 2.23694) : 0}
-        </p>
-        <p className="text-xs">mph</p>
-      </div>
+</button> */}
 
       {/* BOTTOM NAVIGATION BAR (MATCHING DESIGN) */}
       <div className="absolute md:bottom-0 bottom-4 w-full z-20 px-3 md:px-10">
@@ -2175,6 +2179,7 @@ setShowMainRoute(false);
           setDropoffStarted(true);
           handlePickupToDropoff();
   removeMainRoute();
+  removeDestinationRoute();
 setShowMainRoute(false);
   showRouteToNextDestination();
         }}
@@ -2205,6 +2210,7 @@ setShowMainRoute(false);
       handleMidwayToDropoff();
       setDropoffStarted(true);
   removeMainRoute();
+  removeDestinationRoute();
 setShowMainRoute(false); 
   setTimeout(() => {
     showRouteToNextDestination();

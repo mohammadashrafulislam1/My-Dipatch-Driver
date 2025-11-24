@@ -45,7 +45,8 @@ const Dashboard = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const {user, loading, logout} = useAuth();
-  
+  const [notifCount, setNotifCount] = useState(0);
+
   console.log(user)
 
   const handleLogout = async () => {
@@ -273,7 +274,7 @@ const Dashboard = () => {
     </div>
 
     <ul className="max-h-64 overflow-y-auto">
-      <NotificationComp />
+      <NotificationComp onCountChange={setNotifCount}/>
     </ul>
 
     <button
@@ -374,7 +375,7 @@ const Dashboard = () => {
           }} >
               <FiBell className="text-xl cursor-pointer text-[#006FFF]" />
               <div className="bg-[#006FFF] text-white poppins-light text-[10px] px-1 rounded-full absolute top-[-7px] right-[-7px] border-[#fff] border-2">
-                0
+                {notifCount}
               </div>
             </div>
             <div className="bg-[#006eff2a] w-[36px] h-[36px] flex items-center justify-center rounded-lg relative"
