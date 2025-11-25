@@ -157,25 +157,41 @@ const Support = () => {
       </div>
 
       {/* FAQ Section */}
-      <div className="bg-white p-6 rounded-xl shadow-md">
-        <h2 className="text-xl font-semibold mb-4 text-gray-700">
-          Frequently Asked Questions
-        </h2>
-        {isLoadingPage ? (
-          <p className="text-gray-500">Loading FAQs...</p>
-        ) : faqList.length === 0 ? (
-          <p className="text-gray-500">No FAQs available.</p>
-        ) : (
-          <div className="space-y-4">
-            {faqList.map((faq) => (
-              <div key={faq._id || faq.id} className="border-b pb-4">
-                <p className="font-medium text-gray-800">{faq.question}</p>
-                <p className="text-gray-600">{faq.answer}</p>
-              </div>
-            ))}
+<div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
+  <h2 className="text-2xl font-bold mb-6 text-gray-800 flex items-center gap-2">
+    <span className="w-2 h-6 bg-blue-500 rounded-full"></span>
+    Frequently Asked Questions
+  </h2>
+
+  {isLoadingPage ? (
+    <p className="text-gray-500 animate-pulse">Loading FAQs...</p>
+  ) : faqList.length === 0 ? (
+    <p className="text-gray-500">No FAQs available.</p>
+  ) : (
+    <div className="space-y-5">
+      {faqList.map((faq) => (
+        <div
+          key={faq._id || faq.id}
+          className="p-5 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all bg-gray-50"
+        >
+          {/* Question */}
+          <div className="flex items-start gap-3 mb-2">
+            <div className="mt-1 w-2 h-2 rounded-full bg-blue-500"></div>
+            <p className="font-semibold text-gray-900 text-lg">
+              {faq.question}
+            </p>
           </div>
-        )}
-      </div>
+
+          {/* Answer */}
+          <p className="text-gray-600 leading-relaxed pl-5">
+            {faq.answer}
+          </p>
+        </div>
+      ))}
+    </div>
+  )}
+</div>
+
     </div>
   );
 };
