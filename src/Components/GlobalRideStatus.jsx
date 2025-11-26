@@ -12,16 +12,22 @@ const GlobalRideStatus = () => {
     return null;
   }
 
-  // 🚫 Hide if no user or ride doesn't belong to this driver
-  if (
+  // 🚫 Hide for inactive drivers
+if (user?.status === "inactive") {
+  return null;
+}
+
+// 🚫 Hide if conditions not met
+if (
     !user || 
     !isActive || 
     !activeRide || 
     activeRide.driverId !== user._id || 
     !["accepted", "on_the_way", "in_progress"].includes(activeRide.status)
-  ) {
+) {
     return null;
-  }
+}
+
 
   const handleClick = () => {
     if (activeRide && activeRide._id) {

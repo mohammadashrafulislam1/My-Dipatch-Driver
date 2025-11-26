@@ -95,8 +95,8 @@ const Support = () => {
         </div>
       )}
 
-      {/* Submit Ticket */}
-      <div className="bg-white p-6 rounded-xl shadow-md">
+      {/* Submit Ticket hidden*/}
+      <div className="bg-white p-6 rounded-xl shadow-md hidden">
         <h2 className="text-xl font-semibold mb-4 text-gray-700">
           Submit a Support Ticket
         </h2>
@@ -116,8 +116,8 @@ const Support = () => {
         </button>
       </div>
 
-      {/* Ticket List */}
-      <div className="bg-white p-6 rounded-xl shadow-md">
+      {/* Ticket List hidden*/}
+      <div className="bg-white p-6 rounded-xl shadow-md hidden">
         <h2 className="text-xl font-semibold mb-4 text-gray-700">Your Tickets</h2>
         {isLoadingPage ? (
           <p className="text-gray-500">Loading your tickets...</p>

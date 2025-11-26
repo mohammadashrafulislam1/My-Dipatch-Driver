@@ -10,7 +10,7 @@ const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem("driverToken") || null);
   const [loading, setLoading] = useState(true);
 
-  // 🔐 Attach token to every axios request automatically
+  // Attach token automatically
   axios.interceptors.request.use((config) => {
     const savedToken = localStorage.getItem("driverToken");
     if (savedToken) {
@@ -19,7 +19,7 @@ const AuthProvider = ({ children }) => {
     return config;
   });
 
-  // ✅ Load current user using token
+  // Load current user
   const fetchCurrentUser = async () => {
     const savedToken = localStorage.getItem("driverToken");
     if (!savedToken) {
@@ -31,7 +31,7 @@ const AuthProvider = ({ children }) => {
     try {
       const { data } = await axios.get(`${endPoint}/user/me/driver`);
       setUser(data.user);
-      setToken(savedToken); // 🔥 super important
+      setToken(savedToken);
     } catch (err) {
       console.error("Fetch user error:", err.response?.data || err.message);
       localStorage.removeItem("driverToken");
@@ -44,9 +44,16 @@ const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     fetchCurrentUser();
+
+    // 🔥 Auto-refresh user every 5 seconds
+    const interval = setInterval(() => {
+      fetchCurrentUser();
+    }, 5000);
+
+    return () => clearInterval(interval);
   }, []);
 
-  // 🧾 Signup
+  // Signup
   const signup = async (formData) => {
     setLoading(true);
     try {
@@ -62,16 +69,14 @@ const AuthProvider = ({ children }) => {
     }
   };
 
-  // 🔑 Login
+  // Login
   const login = async (formData) => {
     setLoading(true);
     try {
       const { data } = await axios.post(`${endPoint}/user/login`, formData);
-
       localStorage.setItem("driverToken", data.token);
-      setToken(data.token);     // 🔥 store token in state
-      setUser(data.user);       // 🔥 store user in state
-
+      setToken(data.token);
+      setUser(data.user);
       return data;
     } catch (err) {
       console.error("Login error:", err.response?.data || err.message);
@@ -81,7 +86,7 @@ const AuthProvider = ({ children }) => {
     }
   };
 
-  // 🚪 Logout
+  // Logout
   const logout = () => {
     localStorage.removeItem("driverToken");
     setUser(null);
@@ -92,7 +97,7 @@ const AuthProvider = ({ children }) => {
 
   const authInfo = {
     user,
-    token,                 // 🔥 Now token is available in every component
+    token,
     loading,
     signup,
     login,
