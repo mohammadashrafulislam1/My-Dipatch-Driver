@@ -376,19 +376,30 @@ const showRouteToNextDestination = useCallback(async () => {
   let destination;
   let destinationName = "";
 
-  // 🔥 Correct routing logic
+  // 🔥 Correct routing logic for multiple stops
   if (rideStatus === "at_stop") {
-    // Already reached midway → go to dropoff
-    destination = [rideData.dropoff.lng, rideData.dropoff.lat];
-    destinationName = "dropoff";
+    // Check if there are more midway stops
+    if (rideData?.midwayStops?.length > 0) {
+      // Go to the next midway stop
+      destination = [
+        rideData.midwayStops[0].lng,
+        rideData.midwayStops[0].lat
+      ];
+      destinationName = `midway stop ${rideData.midwayStops.length > 1 ? 
+        `${rideData.midwayStops.length} remaining` : '1 remaining'}`;
+    } else {
+      // No more midway stops → go to dropoff
+      destination = [rideData.dropoff.lng, rideData.dropoff.lat];
+      destinationName = "dropoff";
+    }
   } 
   else if (rideData?.midwayStops?.length > 0) {
-    // Going to midway stop
+    // Going to first midway stop
     destination = [
       rideData.midwayStops[0].lng,
       rideData.midwayStops[0].lat
     ];
-    destinationName = "midway stop";
+    destinationName = `midway stop (${rideData.midwayStops.length} stops)`;
   } 
   else {
     // No midway → go directly to dropoff
@@ -397,6 +408,7 @@ const showRouteToNextDestination = useCallback(async () => {
   }
 
   console.log(`🔄 Showing route from current location to ${destinationName}`);
+  console.log(`📍 Remaining stops: ${rideData?.midwayStops?.length || 0}`);
 
   try {
     // Fetch and display route
@@ -547,7 +559,7 @@ const handleStartToPickup = useCallback(async () => {
 
 }, [driverLocation, rideData]);
 
-const removeMidwayStopMarker = () => {
+const removeCurrentMidwayStopMarker = (stopIndex = 0) => {
   const map = mapInstance.current;
   if (!map) {
     console.log("❌ Map instance not available");
@@ -555,30 +567,35 @@ const removeMidwayStopMarker = () => {
   }
 
   try {
-    // REMOVE MIDWAY STOP MARKER LAYER
-    if (map.getLayer("midway-layer")) {
-      map.removeLayer("midway-layer");
-      console.log("✅ Midway layer removed");
-    } else {
-      console.log("⚠️ Midway layer not found");
-    }
-
-    // REMOVE MIDWAY STOP MARKER SOURCE
-    if (map.getSource("midway-stops")) {
-      map.removeSource("midway-stops");
-      console.log("✅ Midway stops source removed");
-    } else {
+    // Get current midway stops source data
+    const midwaySource = map.getSource("midway-stops");
+    if (!midwaySource) {
       console.log("⚠️ Midway stops source not found");
+      return;
     }
 
-    // Also remove any midway stop popups or event listeners
-    const popups = document.querySelectorAll('.mapboxgl-popup');
-    popups.forEach(popup => popup.remove());
+    const currentData = midwaySource._data;
+    if (!currentData || !currentData.features || currentData.features.length === 0) {
+      console.log("⚠️ No midway stops in source data");
+      return;
+    }
 
-    console.log("✅ Midway stop marker cleanup completed");
+    // Remove only the specific stop (first one by default)
+    const updatedFeatures = [...currentData.features];
+    if (updatedFeatures.length > stopIndex) {
+      updatedFeatures.splice(stopIndex, 1); // Remove the specific stop
+    }
+
+    // Update the source with remaining stops
+    midwaySource.setData({
+      type: "FeatureCollection",
+      features: updatedFeatures
+    });
+
+    console.log(`✅ Removed stop ${stopIndex + 1}, ${updatedFeatures.length} stops remaining`);
 
   } catch (error) {
-    console.error("❌ Error removing midway stop marker:", error);
+    console.error("❌ Error removing current midway stop marker:", error);
   }
 };
 
@@ -596,11 +613,22 @@ const removeFirstMidwayStop = () => {
   }));
   
   console.log("✅ First midway stop removed from ride data");
+  console.log("🔄 Remaining midway stops:", updatedMidwayStops.length);
 };
 
 // Stop at midway stop and immediately show route to dropoff
 const handleAtMidwayStop = async () => {
-  setRideStatus("at_stop");
+  const currentStopNumber = (rideData?.midwayStops?.length || 0) > 0 ? 
+    rideData.midwayStops.length : 0;
+  const totalStops = (rideData?.midwayStops?.length || 0) + currentStopNumber;
+  
+  console.log(`🛑 Reached stop ${totalStops - currentStopNumber + 1} of ${totalStops}. ${currentStopNumber - 1} stops remaining`);
+  
+  // Remove only the current midway stop marker (first one)
+  removeCurrentMidwayStopMarker(0);
+  
+  // Remove the first midway stop from data
+  removeFirstMidwayStop();
   
   // Update backend status
   await fetch(`${endPoint}/rides/status/${rideData._id}`, {
@@ -609,17 +637,21 @@ const handleAtMidwayStop = async () => {
     body: JSON.stringify({ status: "at_stop" }),
   });
   
-  console.log("🛑 Reached midway stop");
+  // Check if there are more stops or go to dropoff
+  const remainingStops = rideData?.midwayStops?.length || 0;
+  if (remainingStops > 0) {
+    // More stops remaining
+    setRideStatus("at_stop");
+    console.log(`➡️ ${remainingStops} more stops remaining`);
+  } else {
+    // This was the last stop, prepare for dropoff
+    setRideStatus("at_stop");
+    console.log("➡️ Last stop reached, next: dropoff");
+  }
   
-    // 🆕 REMOVE THE MIDWAY STOP MARKER FROM MAP
-  removeMidwayStopMarker();
-  
-  // 🆕 REMOVE THE FIRST MIDWAY STOP FROM DATA
-  removeFirstMidwayStop();
-  
-  // 🛠️ FIX: Immediately show route from current location to dropoff
+  // Always show route to next destination
   setTimeout(() => {
-    showRouteToDropoffFromCurrentLocation();
+    showRouteToNextDestination();
   }, 100);
 };
 
@@ -1850,7 +1882,7 @@ useEffect(() => {
           bearing: heading || 0,
           pitch: 65,
           zoom: map.getZoom(),
-          duration: 1000,
+          duration: 100,
           easing: (t) => t * (2 - t),
         });
       }
@@ -1864,7 +1896,7 @@ useEffect(() => {
       });
     },
     handleGeoError,
-    { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+    { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
   );
 
   return () => navigator.geolocation.clearWatch(watchId);
@@ -1915,7 +1947,7 @@ console.log("Centering on driver:", driverLocation, "Zoom:", currentZoom);
   // 🔹 Smoothly re-center on driver’s current location (without resetting zoom)
   mapInstance.current.easeTo({
     center: driverLocation,
-    zoom: currentZoom,  // use our controlled zoom state
+    zoom: 17,  // use our controlled zoom state
     duration: 800,
   });
 }, [driverLocation, currentZoom]);
@@ -2015,7 +2047,7 @@ useEffect(() => {
       <div ref={mapRef} className="w-full h-full" />
 
       {/* TOP NAVIGATION HEADER (MATCHING DESIGN) */}
-      <LocationModal />
+         {LocationModal()}
 
       {journeyStarted && currentInstruction && (
         <div className="absolute top-0 left-0 right-0 p-3 z-10 flex justify-between items-start">
@@ -2090,8 +2122,8 @@ useEffect(() => {
 </div>
 
 
-   {/* TEMPORARY RESET BUTTON - Remove after testing
-<button 
+  {/* // TEMPORARY RESET BUTTON - Remove after testing */}
+ <button 
   onClick={() => {
     setRideStatus("accepted");
     setAtPickup(false);
@@ -2105,11 +2137,11 @@ useEffect(() => {
   className="bg-red-500 text-white p-2 rounded absolute top-32 left-4 z-50"
 >
   Reset State
-</button> */}
+</button>
 
       {/* BOTTOM NAVIGATION BAR (MATCHING DESIGN) */}
       <div className="absolute md:bottom-0 bottom-4 w-full z-20 px-3 md:px-10">
-  <div className={`flex flex-col md:flex-row gap-2 items-center justify-between w-full p-4 rounded-xl shadow-2xl 
+  <div className={`flex flex-col md:flex-row gap-2 items-center justify-between md:w-[70%] mx-auto p-4 rounded-xl shadow-2xl 
     ${isDarkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-900"}`}>
 
           <div className="flex-1 flex justify-center items-center">
@@ -2121,7 +2153,7 @@ useEffect(() => {
             ) : (
               <div className="text-center">
                 <p className="font-bold text-lg">{new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>
-                <p className="opacity-70 text-xs">{rideData.distance ? `${rideData.distance} • ${rideData.eta} min` : `${(remaining.distance / 1609.34).toFixed(1)} mi • ${rideData.eta}`}</p>
+                <p className="opacity-70 text-xs">{/* rideData.distance ? */ `${rideData.distance} • ${rideData.eta} ` /* : `${(remaining.distance / 1609.34).toFixed(1)} mi • ${rideData.eta}`*/}</p>
               </div>
             )}
           </div>
@@ -2138,7 +2170,7 @@ setShowMainRoute(false);
   showRouteToNextDestination();
 }}
 
-    className="bg-blue-600 text-white md:px-6 md:py-3 px-3 text-[12px] md:text-xl py-2 rounded-xl font-semibold hover:bg-blue-700 transition"
+    className="bg-blue-600 text-white md:px-6 md:py-3 px-3 text-[12px] md:text-[16px] py-2 rounded-xl font-semibold hover:bg-blue-700 transition"
   >
     Start to Pickup
   </button>
@@ -2154,7 +2186,7 @@ setShowMainRoute(false);
   removePickupMarkerAndRoute();
   showRouteToNextDestination();
     }}
-    className="bg-yellow-500 text-white md:px-6 md:py-3 px-3 text-[12px] md:text-xl py-2 rounded-xl font-semibold hover:bg-yellow-600 transition"
+    className="bg-yellow-500 text-white md:px-6 md:py-3 px-3 text-[12px] md:text-[16px] py-2 rounded-xl font-semibold hover:bg-yellow-600 transition"
   >
     I'm at Pickup
   </button>
@@ -2169,7 +2201,7 @@ setShowMainRoute(false);
           handlePickupToMidway();
           setDropoffStarted(false);
         }}
-        className="bg-green-600 text-white md:px-6 md:py-3 px-3 text-[12px] md:text-xl py-2 rounded-xl font-semibold hover:bg-green-700 transition"
+        className="bg-green-600 text-white md:px-6 md:py-3 px-3 text-[12px] md:text-[16px] py-2 rounded-xl font-semibold hover:bg-green-700 transition"
       >
         Go to Midway
       </button>
@@ -2183,7 +2215,7 @@ setShowMainRoute(false);
 setShowMainRoute(false);
   showRouteToNextDestination();
         }}
-        className="bg-blue-700 text-white md:px-6 md:py-3 px-3 text-[12px] md:text-xl py-2 rounded-xl font-semibold hover:bg-blue-800 transition"
+        className="bg-blue-700 text-white md:px-6 md:py-3 px-3 text-[12px] md:text-[16px] py-2 rounded-xl font-semibold hover:bg-blue-800 transition"
       >
         Start Ride to Dropoff
       </button>
@@ -2191,35 +2223,49 @@ setShowMainRoute(false);
   </>
 )}
 
-{/* Step 3.1: I'm at Stop (Midway) */}
+{/* Step 3.1: I'm at Stop - Show for ALL midway stops with specific numbering */}
 {rideStatus === "on_the_way" && rideData?.midwayStops?.length > 0 && !dropoffStarted && (
-<button
-  onClick={() => {
-    handleAtMidwayStop(); 
-  }}
-  className="bg-yellow-600 text-white md:px-6 md:py-3 px-3 text-[12px] md:text-xl py-2 rounded-xl font-semibold hover:bg-yellow-700 transition"
->
-  I'm at Stop
-</button>
+  <button
+    onClick={() => {
+      handleAtMidwayStop(); 
+    }}
+    className="bg-yellow-600 text-white md:px-6 md:py-3 px-3 text-[12px] md:text-[16px] py-2 rounded-xl font-semibold hover:bg-yellow-700 transition"
+  >
+    {rideData.midwayStops.length > 1 ? 
+      `I'm at Stop ${(rideData.midwayStops?.length || 0) - rideData.midwayStops.length + 1}` : 
+      "I'm at Stop"}
+  </button>
 )}
 
-{/* Step 4: Midway stop → confirm arrival */}
+{/* Step 4: After midway stop — either next stop or dropoff */}
 {rideStatus === "at_stop" && (
   <button
     onClick={() => {
-      handleMidwayToDropoff();
-      setDropoffStarted(true);
-  removeMainRoute();
-  removeDestinationRoute();
-setShowMainRoute(false); 
-  setTimeout(() => {
-    showRouteToNextDestination();
-    console.log("➡️ Routing from current to dropoff");
-  }, 50);
+      if (rideData?.midwayStops?.length > 0) {
+        // More stops to go to
+        setRideStatus("on_the_way");
+        setDropoffStarted(false);
+        console.log(`🔄 Continuing to next stop (${rideData.midwayStops.length} remaining)`);
+      } else {
+        // No more stops, go to dropoff
+        handleMidwayToDropoff();
+        setDropoffStarted(true);
+        console.log("🏁 No more stops, going to dropoff");
+      }
+      
+      removeMainRoute();
+      removeDestinationRoute();
+      setShowMainRoute(false); 
+      
+      setTimeout(() => {
+        showRouteToNextDestination();
+      }, 50);
     }}
-    className="bg-blue-700 text-white md:px-6 md:py-3 px-3 text-[12px] md:text-xl py-2 rounded-xl font-semibold hover:bg-blue-800 transition"
+    className="bg-blue-700 text-white md:px-6 md:py-3 px-3 text-[12px] md:text-[16px] py-2 rounded-xl font-semibold hover:bg-blue-800 transition"
   >
-    Go to Dropoff
+    {rideData?.midwayStops?.length > 0 ? 
+      `Continue to Next ${rideData.midwayStops.length > 1 ? `Stop (${rideData.midwayStops.length} left)` : 'Stop'}` : 
+      "Go to Dropoff"}
   </button>
 )}
 
@@ -2227,7 +2273,7 @@ setShowMainRoute(false);
 {rideStatus === "on_the_way" && dropoffStarted && !atDropoff && (
   <button
     onClick={() => setAtDropoff(true)}
-    className="bg-orange-500 text-white md:px-6 md:py-3 px-3 text-[12px] md:text-xl py-2 rounded-xl font-semibold hover:bg-orange-600 transition"
+    className="bg-orange-500 text-white md:px-6 md:py-3 px-3 text-[12px] md:text-[16px] py-2 rounded-xl font-semibold hover:bg-orange-600 transition"
   >
     I'm at Dropoff
   </button>
@@ -2240,7 +2286,7 @@ setShowMainRoute(false);
       handleFinishRide();
       setRideFinished(true);
     }}
-    className="bg-purple-700 text-white md:px-6 md:py-3 px-3 text-[12px] md:text-xl py-2 rounded-xl font-semibold hover:bg-purple-800 transition"
+    className="bg-purple-700 text-white md:px-6 md:py-3 px-3 text-[12px] md:text-[16px] py-2 rounded-xl font-semibold hover:bg-purple-800 transition"
   >
     Finish Ride
   </button>
@@ -2255,7 +2301,7 @@ setShowMainRoute(false);
 
           <button onClick={handleChatWithCustomer} className={`ml-3 py-3 flex items-center justify-center md:gap-3 gap-1 rounded-xl px-3 md:text-2xl text-[13px]
             ${isDarkMode ? "text-white bg-black" : "text-gray-900 bg-white"}`} title="Chat with customer">
-            <p className="md:!text-[18px] !text-[12px] font-semibold">Chat With Customer</p>
+            <p className="md:!text-[16px] !text-[12px] font-semibold">Chat With Customer</p>
             <FaComments />
           </button>
         </div>

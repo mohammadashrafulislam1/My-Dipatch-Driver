@@ -86,43 +86,50 @@ export default function useLocationPermission({ setDriverLocation }) {
   };
 
   // 🔹 Modal UI
-  const LocationModal = () =>
-    showLocationModal ? (
-      <div className="fixed inset-0 flex items-center justify-center bg-black/60 z-[9999]">
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 max-w-sm w-[90%] text-center">
-          <h2 className="text-2xl font-semibold mb-3 text-gray-900 dark:text-white">
-            Enable Location Access
-          </h2>
-          <p className="text-gray-600 dark:text-gray-300 text-sm mb-6">
-            To use live tracking and navigation, please allow this app to access
-            your location. This is required for route updates and real-time tracking.
-          </p>
+const LocationModal = () => {
+  if (!showLocationModal) return null;
 
-          <div className="flex flex-col gap-3">
-            <button
-              onClick={requestLocationPermission}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg font-semibold transition"
-            >
-              Enable Location
-            </button>
+  return (
+    <div className="fixed inset-0 flex items-center justify-center bg-black/60 z-[9999]">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 max-w-sm w-[90%] text-center">
 
-            <button
-              onClick={openLocationSettings}
-              className="bg-yellow-500 hover:bg-yellow-600 text-white px-5 py-2 rounded-lg font-semibold transition"
-            >
-              Open Settings
-            </button>
+        <h2 className="text-2xl font-semibold mb-3 text-gray-900 dark:text-white">
+          Enable Location Access
+        </h2>
 
-            <button
-              onClick={() => setShowLocationModal(false)}
-              className="bg-gray-300 hover:bg-gray-400 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white px-5 py-2 rounded-lg font-semibold transition"
-            >
-              Cancel
-            </button>
-          </div>
+        <p className="text-gray-600 dark:text-gray-300 text-sm mb-6">
+          To use live tracking, allow location access.
+        </p>
+
+        <div className="flex flex-col gap-3">
+          <button
+            onClick={requestLocationPermission}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg font-semibold"
+          >
+            Enable Location
+          </button>
+
+          <button
+            onClick={openLocationSettings}
+            className="bg-yellow-500 hover:bg-yellow-600 text-white px-5 py-2 rounded-lg font-semibold"
+          >
+            Open Settings
+          </button>
+
+          <button
+            onClick={() => setShowLocationModal(false)}
+            className="bg-gray-300 hover:bg-gray-400 dark:bg-gray-700 dark:hover:bg-gray-600 
+                       text-gray-900 dark:text-white px-5 py-2 rounded-lg font-semibold"
+          >
+            Cancel
+          </button>
         </div>
+
       </div>
-    ) : null;
+    </div>
+  );
+};
+
 
   return {
     locationEnabled,

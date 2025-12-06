@@ -11,6 +11,9 @@ const FloatingDeactivateBtn = ({ userId, onDeactivated }) => {
       setLoading(true);
       await axios.put(`${endPoint}/user/${userId}/status`, { status: "inactive" });
       if (onDeactivated) onDeactivated(); // callback to parent
+      setTimeout(() => {
+        window.location.reload();
+      }, 300);
     } catch (error) {
       console.error("Error deactivating driver:", error);
     } finally {

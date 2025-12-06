@@ -294,15 +294,23 @@ useEffect(() => {
       <p className="md:text-[16px] text-[14px] text-gray-700 poppins-regular md:mb-2 mb-3 px-6">
         Your city: {cityName}.
       </p>
-      <button
-        onClick={handleStartRide}
-        className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 
-          hover:to-green-600 text-white md:text-lg text-md font-semibold 
-          poppins-regular py-3 px-8 rounded-full shadow-lg transition 
-          duration-300 transform hover:scale-105"
-      >
-        Start Ride
-      </button>
+      {user?.isActive === false ? (
+  <div className="mt-4 px-4 py-3 bg-red-100 border border-red-300 text-red-700 rounded-xl font-semibold text-[15px]">
+    🚫 Your account is not activated by the administration.  
+    <br />Please wait for the admin to approve your driver account.
+  </div>
+) : (
+  <button
+    onClick={handleStartRide}
+    className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 
+      hover:to-green-600 text-white md:text-lg text-md font-semibold 
+      poppins-regular py-3 px-8 rounded-full shadow-lg transition 
+      duration-300 transform hover:scale-105"
+  >
+    Start Ride
+  </button>
+)}
+
     </div>
   )
 ) : (
