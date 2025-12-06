@@ -1882,7 +1882,7 @@ useEffect(() => {
           bearing: heading || 0,
           pitch: 65,
           zoom: map.getZoom(),
-          duration: 100,
+          duration: 0,
           easing: (t) => t * (2 - t),
         });
       }
