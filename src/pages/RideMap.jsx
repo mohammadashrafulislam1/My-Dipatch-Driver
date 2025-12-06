@@ -1,10 +1,10 @@
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useEffect, useRef, useState, useCallback } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css"; // ADD THIS LINE - IMPORT MAPBOX CSS
 import mbxDirections from "@mapbox/mapbox-sdk/services/directions";
 import * as turf from "@turf/turf";
-import { FaArrowUp } from "react-icons/fa";
+import { FaArrowUp, FaHome } from "react-icons/fa";
 import { FaArrowRight, FaReply, FaChevronCircleUp, FaCrosshairs, FaPlus, FaMinus, FaComments } from "react-icons/fa";
 import { endPoint } from "../Components/ForAPIs";
 import { useActiveRide } from "../contexts/ActiveRideContext";
@@ -2141,9 +2141,11 @@ useEffect(() => {
 
       {/* BOTTOM NAVIGATION BAR (MATCHING DESIGN) */}
       <div className="absolute md:bottom-0 bottom-4 w-full z-20 px-3 md:px-10">
-  <div className={`flex flex-col md:flex-row gap-2 items-center justify-between md:w-[70%] mx-auto p-4 rounded-xl shadow-2xl 
+  <div className={`flex flex-col md:flex-row gap-2 items-center justify-between lg:w-[65%] mx-auto p-4 rounded-xl shadow-2xl 
     ${isDarkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-900"}`}>
-
+        <Link to="/"><button className="bg-grey-500 p-3 rounded-full text-2xl">
+          <FaHome />
+        </button></Link>
           <div className="flex-1 flex justify-center items-center">
             {journeyStarted ? (
               <div className="text-center">

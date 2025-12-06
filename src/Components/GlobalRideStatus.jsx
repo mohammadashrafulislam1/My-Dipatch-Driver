@@ -6,7 +6,6 @@ import useAuth from './useAuth';
 const GlobalRideStatus = () => {
   const { user, loading: authLoading } = useAuth();
   const { isActive, activeRide } = useActiveRide();
-
   // 🚫 Show nothing while checking authentication
   if (authLoading) {
     return null;
@@ -52,7 +51,7 @@ if (
   const distanceText = activeRide?.distance ? `${activeRide.distance}` : '';
 
   return (
-    <>
+    <div className='global-ride-btn'>
       {/* Desktop */}
       <button
         onClick={handleClick}
@@ -124,7 +123,7 @@ if (
           </span>
         </div>
       </button>
-    </>
+    </div>
   );
 };
 

@@ -16,73 +16,44 @@ import Support from "../pages/Driver/Dashboard/Support";
 import RideMap from "../pages/RideMap";
 import PrivateRoute from "./PrivateRouter";
 import ErrorPage from "../Components/ErrorPage";
+import Layout from "../Components/Layout";
 
 export const router = createBrowserRouter([
-    {
-        path:'/dashboard',
-        element:<Dashboard/>,
-        errorElement:<ErrorPage/>,
-        children:[
-            {
-                path:'',
-                element:<Default/>
-            },
-            {
-                path:'orders',
-                element:<Order/>
-            },
-            {
-                path:'reviews',
-                element:<Reviews/>
-            },
-            {
-                path:'earnings',
-                element:<Earnings/>
-            },
-            {
-                path:'support',
-                element:<Support/>
-            },
-            {
-                path:'chat',
-                element:<Chat/>
-            },
-            {
-                path:'wallet',
-                element:<Wallet/>
-            },
-            {
-                path:'profile',
-                element:<Profile/>
-            },
-            {
-                path:'settings',
-                element:<Settings/>
-            },
-            {
-                path:'notifications',
-                element:<Notification/>
-            },
+  {
+    path: "/",
+    element: <Layout />,     // ⭐ Global wrapper
+    errorElement: <ErrorPage />,
+    children: [
+      { path: "/", element: <Driver /> },
+
+      {
+        path: "dashboard",
+        element: <Dashboard />,
+        children: [
+          { index: true, element: <Default /> },
+          { path: "orders", element: <Order /> },
+          { path: "reviews", element: <Reviews /> },
+          { path: "earnings", element: <Earnings /> },
+          { path: "support", element: <Support /> },
+          { path: "chat", element: <Chat /> },
+          { path: "wallet", element: <Wallet /> },
+          { path: "profile", element: <Profile /> },
+          { path: "settings", element: <Settings /> },
+          { path: "notifications", element: <Notification /> }
         ]
-    },
-    {
-        path:'/',
-        element:<Driver/>,
-        errorElement:<ErrorPage/>
-    },
-    {
-        path:'/ride/:id',
-        element:<PrivateRoute><RideMap/></PrivateRoute>,
-        errorElement:<ErrorPage/>
-    },
-    {
-        path:'/login',
-        element:<Login/>,
-        errorElement:<ErrorPage/>
-    },
-    {
-        path:'/signup',
-        element:<Signup/>,
-        errorElement:<ErrorPage/>
-    },
-])
+      },
+
+      {
+        path: "ride/:id",
+        element: (
+          <PrivateRoute>
+            <RideMap />
+          </PrivateRoute>
+        )
+      },
+
+      { path: "login", element: <Login /> },
+      { path: "signup", element: <Signup /> },
+    ]
+  }
+]);
