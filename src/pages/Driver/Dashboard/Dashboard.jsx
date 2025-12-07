@@ -322,7 +322,7 @@ useEffect(() => {
 </div>
 
 {showNotifications && (
-  <div className="absolute right-4 top-14 w-80 bg-white shadow-xl rounded-xl z-50 border border-gray-200">
+  <div className="absolute right-4 top-14 lg:w-[25%] md:w-[45%] w-[90%] bg-white shadow-xl rounded-xl z-50 border border-gray-200">
     <div className="px-4 py-3 border-b">
       <h3 className="text-base font-semibold text-gray-800">Notifications</h3>
     </div>

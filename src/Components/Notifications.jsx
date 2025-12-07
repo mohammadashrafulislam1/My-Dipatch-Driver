@@ -174,7 +174,7 @@ const NotificationComp = ({ onCountChange = () => {} }) => {
               </span>
             )}
           </div>
-          <h2 className="text-2xl font-semibold text-gray-800">Notifications</h2>
+          <h2 className="lg:text-2xl text-xl font-semibold text-gray-800">Notifications</h2>
         </div>
         {unreadCount > 0 && (
           <button
