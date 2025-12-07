@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   BiSupport,
   BiWalletAlt,
@@ -28,13 +28,9 @@ import { VscSignOut } from "react-icons/vsc";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import useAuth from "../../../Components/useAuth";
 import NotificationComp from "../../../Components/Notifications";
-
-
-const messages = [
-  { id: 1, name: "John Doe", online: true },
-  { id: 2, name: "Jane Smith", online: false },
-  { id: 3, name: "Mike Johnson", online: true },
-];
+import axios from "axios";
+import { endPoint } from "../../../Components/ForAPIs";
+import { io } from "socket.io-client";
 
 
 const Dashboard = () => {
@@ -46,8 +42,66 @@ const Dashboard = () => {
   const [showDropdown, setShowDropdown] = useState(false);
   const {user, loading, logout} = useAuth();
   const [notifCount, setNotifCount] = useState(0);
+const [chatUser, setChatUser] = useState(null);
+const [activeRideId, setActiveRideId] = useState(null);
+const [rideStatus, setRideStatus] = useState(null);
+const [chatCount, setChatCount] = useState(0);
 
-  console.log(user)
+useEffect(() => {
+  if (!user?._id) return;
+
+  const socket = io("https://my-dipatch-backend.onrender.com", {
+    query: { userId: user._id, role: user.role },
+    withCredentials: true,
+  });
+
+  // 🔹 Join the same way as Chat.jsx
+  socket.emit("join", { userId: user._id, role: user.role });
+
+  // 🔹 Listen for messages
+  socket.on("chat-message", (msg) => {
+    console.log("📩 Dashboard got chat-message:", msg);
+
+    // Only count messages sent *to* this user (not their own messages)
+    if (msg.recipientId === user._id) {
+      setChatCount((prev) => prev + 1);
+    }
+  });
+
+  return () => {
+    socket.off("chat-message");
+    socket.disconnect();
+  };
+}, [user?._id, user?.role]);
+
+useEffect(() => {
+  const loadChatUser = async () => {
+    try {
+      // get active ride
+      const storedRide = localStorage.getItem("activeRide");
+      if (!storedRide) return;
+
+      const ride = JSON.parse(storedRide);
+
+      setActiveRideId(ride._id);
+      setRideStatus(ride.status);
+
+      let recipientId =
+        user.role === "driver" ? ride.customerId : ride.driverId;
+
+      if (!recipientId) return;
+
+      const res = await axios.get(`${endPoint}/user/${recipientId}`);
+
+      setChatUser(res.data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  loadChatUser();
+}, [user]);
+  
 
   const handleLogout = async () => {
     try {
@@ -293,35 +347,32 @@ const Dashboard = () => {
   <div className="absolute right-16 top-14 w-80 bg-white shadow-xl rounded-xl z-50 overflow-hidden">
     <div className="max-h-72 overflow-y-auto">
       <ul>
-        {messages.slice(0, 5).map((user) => (
-          <li
-            key={user.id}
-            onClick={() => {
-              setShowMessages(false);
-              window.location.href = `/dashboard/chat?user=${user.id}`;
-            }}
-            className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-100 
-            `}
-          >
-            <div className="relative">
-              <div className="w-10 h-10 bg-blue-200 rounded-full flex items-center justify-center text-lg font-semibold text-white">
-              {user.name.charAt(0)}
-              </div>
-              <BsCircleFill
-                className={`absolute -bottom-1 -right-1 text-xs ${
-                  user.online ? "text-green-500" : "text-gray-400"
-                }`}
-              />
-            </div>
-            <div>
-              <p className="font-medium text-sm">{user.name}</p>
-              <div className="text-sm text-gray-500">
-                  {user.online ? "Online" : "Offline"}
-                </div>
-              <p className="text-xs text-gray-500 truncate w-48">{user.lastMessage}</p>
-            </div>
-          </li>
-        ))}
+       {chatUser ? (
+  <li
+    onClick={() => {
+      setShowMessages(false);
+      window.location.href =
+        `/dashboard/chat?user=${chatUser._id}&rideId=${activeRideId}&rideStatus=${rideStatus}`;
+    }}
+    className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-100"
+  >
+    <div className="relative">
+      <div className="w-10 h-10 bg-blue-200 rounded-full flex items-center justify-center text-lg font-semibold">
+        {chatUser.firstName.charAt(0)}
+      </div>
+    </div>
+
+    <div>
+      <p className="font-medium">{chatUser.firstName} {chatUser.lastName}</p>
+      <p className="text-xs text-gray-500">
+        Chat Available
+      </p>
+    </div>
+  </li>
+) : (
+  <p className="text-center py-4 text-gray-500">No active ride chat.</p>
+)}
+
       </ul>
     </div>
   </div>
@@ -383,10 +434,11 @@ const Dashboard = () => {
               setShowMessages(!showMessages);
               setShowNotifications(false);
               setShowSettings(false);
+  setChatCount(0); 
             }}>
               <FiMessageSquare className="text-xl cursor-pointer text-[#006FFF]" />
               <div className="bg-[#006FFF] text-white poppins-light text-[10px] px-1 rounded-full absolute top-[-7px] right-[-7px] border-[#fff] border-2">
-                0
+                {chatCount}
               </div>
             </div>
             <div className="bg-[#ff04002a] w-[36px] h-[36px] flex items-center justify-center rounded-lg relative"

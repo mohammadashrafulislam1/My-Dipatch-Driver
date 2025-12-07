@@ -60,7 +60,7 @@ export const ActiveRideProvider = ({ children }) => {
         setIsActive(true);
         localStorage.setItem("activeRide", JSON.stringify(myActiveRide));
         localStorage.setItem("rideActive", "true");
-        console.log("✅ Loaded active ride from backend:", myActiveRide.status);
+        // console.log("✅ Loaded active ride from backend:", myActiveRide.status);
       } else {
         console.log("🧹 No active rides for user — clearing localStorage");
         setActiveRide(null);
@@ -134,9 +134,9 @@ export const ActiveRideProvider = ({ children }) => {
   };
 
   // 🪄 Debug log (optional)
-  useEffect(() => {
-    console.log("🪄 ActiveRideContext updated:", { activeRide, isActive });
-  }, [activeRide, isActive]);
+  // useEffect(() => {
+  //   console.log("🪄 ActiveRideContext updated:", { activeRide, isActive });
+  // }, [activeRide, isActive]);
 
   const value = {
     activeRide,
