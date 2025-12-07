@@ -1,58 +1,64 @@
 import { useEffect, useState } from "react";
 import { FaStar } from "react-icons/fa";
+import axios from "axios";
+import useAuth from "../../../Components/useAuth";
+import { endPoint } from "../../../Components/ForAPIs";
 
 const Reviews = () => {
+  const { user, token } = useAuth(); // token needed for auth
   const [reviews, setReviews] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const reviewsPerPage = 4;
+  // console.log(user)
+useEffect(() => {
+  if (!user) return;
 
-  useEffect(() => {
-    // Dummy data — Replace with API call
-    setReviews([
-      {
-        id: 1,
-        customerName: "John Doe",
-        rating: 4,
-        comment: "Driver was punctual and friendly.",
-        rideDate: "2025-07-05",
-      },
-      {
-        id: 2,
-        customerName: "Emily Clark",
-        rating: 5,
-        comment: "Excellent experience, car was clean.",
-        rideDate: "2025-07-04",
-      },
-      {
-        id: 3,
-        customerName: "David Lee",
-        rating: 3,
-        comment: "Ride was okay, but driver took a longer route.",
-        rideDate: "2025-07-03",
-      },
-      {
-        id: 4,
-        customerName: "Sophia Martinez",
-        rating: 5,
-        comment: "Very friendly and professional driver.",
-        rideDate: "2025-07-02",
-      },
-      {
-        id: 5,
-        customerName: "Michael Scott",
-        rating: 2,
-        comment: "Driver was late and didn't follow map.",
-        rideDate: "2025-07-01",
-      },
-    ]);
-  }, []);
+  const fetchReviews = async () => {
+    try {
+      const res = await axios.get(`${endPoint}/review/driver/${user._id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.status === 200) {
+        const reviewsData = res.data.reviews || [];
+
+        // Fetch customer info for each review
+        const reviewsWithUser = await Promise.all(
+          reviewsData.map(async (review) => {
+            try {
+              const customerId = review.customerId._id || review.customerId;
+              const userRes = await axios.get(`${endPoint}/user/${customerId}`, {
+                headers: { Authorization: `Bearer ${token}` },
+              });
+              return { ...review, customerInfo: userRes.data.user || userRes.data }; // attach customer info
+            } catch (err) {
+              console.error("Error fetching user info:", err);
+              return { ...review, customerInfo: null };
+            }
+          })
+        );
+
+        setReviews(reviewsWithUser);
+      } else {
+        console.error("Error fetching reviews:", res.data.message);
+      }
+    } catch (err) {
+      console.error("Error fetching reviews:", err);
+    }
+  };
+
+  fetchReviews();
+}, [user, token]);
+
+
 
   // Pagination calculations
   const indexOfLastReview = currentPage * reviewsPerPage;
   const indexOfFirstReview = indexOfLastReview - reviewsPerPage;
-  const currentReviews = reviews.slice(indexOfFirstReview, indexOfLastReview);
-  const totalPages = Math.ceil(reviews.length / reviewsPerPage);
-
+  
+// Pagination calculations (safe)
+const currentReviews = (reviews || []).slice(indexOfFirstReview, indexOfLastReview);
+const totalPages = Math.ceil((reviews?.length || 0) / reviewsPerPage);
   const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
   return (
@@ -66,14 +72,17 @@ const Reviews = () => {
           <div className="flex flex-col gap-6">
             {currentReviews.map((review) => (
               <div
-                key={review.id}
+                key={review._id}
                 className="bg-white shadow rounded-lg p-5 border border-gray-100 hover:shadow-md transition"
               >
                 <div className="flex justify-between items-center mb-2">
-                  <h2 className="text-lg font-semibold text-gray-800">
-                    {review.customerName}
-                  </h2>
-                  <span className="text-sm text-gray-500">{review.rideDate}</span>
+                 <h2 className="text-lg font-semibold text-gray-800">
+  {review.customerInfo ? `${review.customerInfo.firstName} ${review.customerInfo.lastName}` : "Anonymous"}
+</h2>
+
+                  <span className="text-sm text-gray-500">
+                    {new Date(review.createdAt).toLocaleDateString()}
+                  </span>
                 </div>
 
                 {/* Star Rating */}
