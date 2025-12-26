@@ -1,649 +1,558 @@
-// Driver/Rider chat
-import { useState, useEffect, useRef } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
-import { IoSend, IoArrowBackOutline } from "react-icons/io5";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { IoSend } from "react-icons/io5";
 import { BsPaperclip } from "react-icons/bs";
-import { MdImage } from "react-icons/md";
+import { MdImage, MdOutlineSupportAgent } from "react-icons/md";
 import useAuth from "../../../Components/useAuth";
 import axios from "axios";
 import { endPoint } from "../../../Components/ForAPIs";
-import io from 'socket.io-client'; // 1. Import socket.io-client
+import io from "socket.io-client";
+import { v4 as uuidv4 } from "uuid";
 
+const allowedStatuses = ["accepted", "on_the_way", "in_progress"];
 
 const Chat = () => {
-  const [selectedUser, setSelectedUser] = useState(null);
-  const [users, setUsers] = useState([]);
+  const { user, token } = useAuth();
+const [sending, setSending] = useState(false);
   const [message, setMessage] = useState("");
-  const [messages, setMessages] = useState({});
+  const [messages, setMessages] = useState([]);
   const [selectedFile, setSelectedFile] = useState(null);
+
+  const [ride, setRide] = useState(null);
   const [rideStatus, setRideStatus] = useState(null);
-  const [activeRide, setActiveRide] = useState(null); 
+  const [customer, setCustomer] = useState(null);
 
-  const { user,token } = useAuth(); // Assume user object contains the current user's details (driver/customer)
+  const [activeChat, setActiveChat] = useState("customer");
+  const [adminIds, setAdminIds] = useState([]);
 
-  const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
-
+  const socket = useRef(null);
   const fileInputRef = useRef(null);
   const imageInputRef = useRef(null);
-  const messagesEndRef = useRef(null); // Ref for auto-scrolling
-  const socket = useRef(null); // Ref to hold the socket instance
+  const messagesEndRef = useRef(null);
 
-  const userIdFromQuery = searchParams.get("user");
-  const rideStatusFromQuery = searchParams.get("rideStatus");
-  const rideIdFromQuery = searchParams.get("rideId"); 
+  /* ------------------ helpers ------------------ */
+  const dedupeByClientMessageId = (msgs) => {
+    const map = new Map();
 
-  // Allowed statuses for messaging
-  const allowedStatuses = ["accepted", "on_the_way", "in_progress"];
-  const canSendMessages = rideStatus && allowedStatuses.includes(rideStatus);
+    for (const msg of msgs) {
+      const key = msg.clientMessageId || msg._id;
+      if (!map.has(key)) {
+        map.set(key, msg);
+      } else if (map.get(key).optimistic && !msg.optimistic) {
+        map.set(key, msg);
+      }
+    }
 
-  // Function to handle incoming messages from the socket (for both customer and driver)
-  const handleIncomingMessage = (msg) => {
-    console.log("Received new message via socket:", msg);
-    
-    // Determine the chat partner's ID (the user whose chat window should update)
-    const partnerId = msg.senderId === user._id ? msg.recipientId : msg.senderId;
-
-    // Format the incoming message structure to match existing state format
-    const formattedMessage = {
-        from: msg.senderId === user._id ? "me" : "other", // 'me' if sender is current user (e.g., sent from another device)
-        text: msg.message,
-        file: msg.fileUrl,
-        fileType: msg.fileType, // Assuming backend sends "image" or "file"
-        fileName: msg.fileUrl ? msg.fileUrl.split('/').pop() : 'File', // Simplified file name extraction
-        timestamp: msg.createdAt,
-        optimistic: false // Ensure confirmed messages are not marked as optimistic
-    };
-
-    setMessages((prev) => ({
-        ...prev,
-        [partnerId]: [...(prev[partnerId] || []).filter(m => !m.optimistic), formattedMessage],
-    }));
+    return Array.from(map.values()).sort(
+      (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
+    );
   };
 
-  // 2. Socket connection and listener setup
+  /* ------------------ socket ------------------ */
   useEffect(() => {
-      if (!user?._id) return;
-      
-      // 1. Initialize Socket
-      // Ensure the endPoint is the base URL of the socket server (e.g., http://localhost:5000)
-      socket.current = io("https://my-dipatch-backend.onrender.com", {
-          query: { userId: user._id, role: user.role },
-          withCredentials: true,
+    if (!user?._id) return;
+
+    socket.current = io("https://my-dipatch-backend.onrender.com/", {
+      query: { userId: user._id, role: user.role },
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    socket.current.emit("join", { userId: user._id, role: user.role });
+
+    socket.current.on("chat-message", (msg) => {
+      console.log(msg)
+  setMessages((prev) => dedupeByClientMessageId([...prev, msg]));
+});
+
+
+    socket.current.on("support-message", (msg) => {
+      if (msg.senderId === user._id || msg.recipientId === user._id) {
+        setMessages((prev) => dedupeByClientMessageId([...prev, msg]));
+      }
+    });
+
+    return () => socket.current.disconnect();
+  }, [user?._id]);
+
+  /* ------------------ admins ------------------ */
+  useEffect(() => {
+    const fetchAdmins = async () => {
+      const res = await axios.get(`${endPoint}/user`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
 
-      // 2. Join User Room (using socket id as room name for private messaging)
-      socket.current.emit("join", { userId: user._id, role: user.role });
-      console.log(`Socket client joined as: ${user._id}`);
+      setAdminIds(res.data.filter(u => u.role === "admin").map(a => a._id));
+    };
 
-      // 3. Attach Listener
-      socket.current.on("chat-message", handleIncomingMessage);
+    fetchAdmins();
+  }, []);
 
-      // 4. Cleanup
-      return () => {
-          socket.current.off("chat-message", handleIncomingMessage);
-          socket.current.disconnect();
-      };
-  }, [user?._id, user?.role, endPoint]); 
+  /* ------------------ can chat ------------------ */
+  const canChat = useMemo(() => {
+    if (activeChat === "cs") return true;
+    if (activeChat === "customer" && rideStatus) {
+      return allowedStatuses.includes(rideStatus);
+    }
+    return false;
+  }, [activeChat, rideStatus]);
 
-  // Scroll to bottom when messages update
+  /* ------------------ fetch support chat ------------------ */
+  useEffect(() => {
+    const fetchSupportChat = async () => {
+      if (activeChat !== "cs" || !user?._id) return;
+
+      try {
+        const res = await axios.get(`${endPoint}/chat/support`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setMessages((prev) =>
+          dedupeByClientMessageId([
+            ...prev,
+            ...res.data.messages.map(msg => ({ ...msg, clientMessageId: msg.clientMessageId }))
+          ])
+        );
+      } catch (err) {
+        console.error("Failed to fetch support chat:", err);
+      }
+    };
+
+    fetchSupportChat();
+  }, [activeChat, user?._id]);
+
+  /* ------------------ fetch active ride ------------------ */
+  useEffect(() => {
+    if (!user?._id || activeChat !== "customer") return;
+
+    const loadRide = async () => {
+      try {
+        const res = await axios.get(`${endPoint}/rides`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+     const driverRides = res.data.rides?.filter(r => r.driverId === user._id) || [];
+        const activeRide = driverRides?.find(r =>
+          allowedStatuses.includes(r.status)
+        );
+
+        if (!activeRide) {
+          setRide(null);
+          setCustomer(null);
+          setMessages([]);
+          return;
+        }
+
+        setRide(activeRide);
+        setRideStatus(activeRide.status);
+
+        const customerRes = await axios.get(
+          `${endPoint}/user/${activeRide.customerId}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setCustomer(customerRes.data);
+
+        const chatRes = await axios.get(
+          `${endPoint}/chat/driver/${activeRide._id}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        setMessages(dedupeByClientMessageId(chatRes.data.messages || []));
+      } catch (err) {
+        console.error("Failed to fetch ride/chat:", err);
+      }
+    };
+
+    loadRide();
+  }, [user?._id, activeChat]);
+
+  /* ------------------ scroll ------------------ */
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, selectedUser]);
+  }, [messages, activeChat]);
 
+  console.log("message", messages)
+  /* ------------------ displayed messages ------------------ */
+ const displayedMessages = messages.filter((msg) => {
+  if (activeChat === "customer") {
+    return (
+      (msg.senderId === user._id && msg.recipientId === customer?._id) ||
+      (msg.senderId === customer?._id && msg.recipientId === user._id)
+    );
+  }
 
-useEffect(() => {
-  const fetchChatHistory = async () => {
-    if (!selectedUser || !user?._id) return;
+  if (activeChat === "cs") {
+    // Only include messages sent/received by admins
+    return (
+      (msg.senderRole === "admin" && msg.recipientId === user._id) || // from admin to me
+      (msg.senderId === user._id && adminIds.includes(msg.recipientId)) // from me to admin
+    );
+  }
 
-    // ✅ Try to get ride ID from query or localStorage
-    let rideIdToUse = rideIdFromQuery;
-    if (!rideIdToUse) {
-      const storedRide = localStorage.getItem("activeRide");
-      if (storedRide) {
-        try {
-          const parsedRide = JSON.parse(storedRide);
-          rideIdToUse = parsedRide._id;
-        } catch (err) {
-          console.error("Failed to parse activeRide:", err);
-        }
-      }
-    }
-
-    if (!rideIdToUse) {
-      console.log("⚠️ No rideId found for chat history");
-      return;
-    }
-
-    try {
-      console.log(`Fetching chat history for ride: ${rideIdToUse}`);
-      const res = await axios.get(`${endPoint}/chat/driver/${rideIdToUse}`, {
-  headers: {
-    Authorization: `Bearer ${token}`,
-  },
+  return false;
 });
- console.log(res)
-      const history = res.data.messages || [];
 
-      // ✅ Format messages
-      const formattedHistory = history.map((msg) => ({
-        from: msg.senderId === user._id ? "me" : "other",
-        text: msg.message,
-        file: msg.fileUrl,
-        fileType: msg.fileType,
-        fileName: msg.fileUrl ? msg.fileUrl.split("/").pop() : "File",
-        timestamp: msg.createdAt,
-        optimistic: false,
-      }));
 
-      setMessages((prev) => ({
-        ...prev,
-        [selectedUser.id]: formattedHistory,
-      }));
-    } catch (error) {
-      console.error("Failed to load chat history:", error.response?.data || error);
-    }
-  };
+  /* ------------------ dedupe displayed messages ------------------ */
+const dedupedMessages = (() => {
+  const map = new Map();
 
-  fetchChatHistory();
-}, [selectedUser, user?._id, rideIdFromQuery]);
-
-  
- useEffect(() => {
-  const fetchRideAndUser = async () => {
-    if (!user?._id) {
-      setUsers([]);
-      return;
-    }
-
-    // ✅ 1. Try to get ride from URL or localStorage
-    let rideIdToUse = rideIdFromQuery;
-    let activeRideData = null;
-
-    if (!rideIdToUse) {
-      const storedRide = localStorage.getItem("activeRide");
-      if (storedRide) {
-        try {
-          activeRideData = JSON.parse(storedRide);
-          rideIdToUse = activeRideData._id;
-          console.log("Loaded active ride from localStorage:", activeRideData);
-        } catch (err) {
-          console.error("Failed to parse activeRide from localStorage:", err);
-        }
-      }
-    }
-
-    if (!rideIdToUse) {
-      console.log("No active ride found in URL or localStorage.");
-      setUsers([]);
-      return;
-    }
-
-    try {
-      // ✅ 2. Use stored data if available
-      let ride = activeRideData;
-      if (!ride) {
-        const rideRes = await axios.get(`${endPoint}/rides/${rideIdToUse}`);
-        ride = rideRes.data.ride;
-      }
-
-      setActiveRide(ride);
-      setRideStatus(ride.status);
-
-      // ✅ 3. Determine recipient
-      let recipientId = null;
-      if (user.role === "driver" && ride.customerId) {
-        recipientId = ride.customerId;
-      } else if (user.role === "customer" && ride.driverId) {
-        recipientId = ride.driverId;
-      }
-
-      if (recipientId) {
-        const userRes = await axios.get(`${endPoint}/user/${recipientId}`);
-        const recipientUser = userRes.data;
-
-        const chatUser = {
-          id: recipientUser._id,
-          firstname: recipientUser.firstName,
-          lastname: recipientUser.lastName,
-        };
-        setUsers([chatUser]);
-
-      } else {
-        setUsers([]);
-      }
-    } catch (err) {
-      console.error("Failed to load ride or user:", err);
-      setUsers([]);
-    }
-  };
-
-  fetchRideAndUser();
-}, [endPoint, user?._id, rideIdFromQuery, userIdFromQuery, selectedUser]);
-console.log("📥 Fetching chat history for:", selectedUser?.id);
-
-// ✅ Restore chat after reload (FINAL FIX)
-useEffect(() => {
-  if (!user?._id) return;
-  if (users.length === 0) return;
-
-  // If already selected, do nothing
-  if (selectedUser) return;
-
-  const u = users[0];
-
-  // Restore rideId
-  let rideIdToUse = rideIdFromQuery;
-  if (!rideIdToUse) {
-    const storedRide = localStorage.getItem("activeRide");
-    if (storedRide) {
-      try {
-        rideIdToUse = JSON.parse(storedRide)._id;
-      } catch {}
+  for (const msg of displayedMessages) {
+    const key = msg.clientMessageId || msg._id;
+    if (!map.has(key)) {
+      map.set(key, msg);
+    } else if (map.get(key).optimistic && !msg.optimistic) {
+      map.set(key, msg);
     }
   }
 
-  // Set the selected user
-  setSelectedUser(u);
-
-  // Update URL correctly (important!)
-  navigate(
-    `/dashboard/chat?user=${u.id}&rideId=${rideIdToUse}&rideStatus=${rideStatus}`,
-    { replace: true }
+  return Array.from(map.values()).sort(
+    (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
   );
-}, [users, user?._id]);
+})();
 
-
-  // Check if the user is selectable (i.e., if messaging is allowed)
-  const isUserSelectable = () => canSendMessages;
-  
-  const handleUserClick = (user) => {
-    if (isUserSelectable()) { // Check if selectable before proceeding
-        setSelectedUser(user);
-        // Updated navigation to include rideId
-        navigate(`/dashboard/chat?user=${user.id}&rideId=${rideIdFromQuery}&rideStatus=${rideStatus}`);
-    } else {
-        // IMPORTANT: Never use alert() in canvas, use a custom message box instead, but for now we keep it to fulfill the original logic.
-        alert(`Chat is disabled. Ride status is: "${rideStatus}"`); 
-    }
-  };
-
-  const handleSend = async () => { // Make function async
-    // Check if messaging is allowed
-    if (!canSendMessages) {
-      alert("Messaging is only available when ride status is: accepted, on_the_way, or in_progress");
-      return;
-    }
-
-    if (!message.trim() && !selectedFile) return;
-    if (!selectedUser) return;
+  /* ------------------ send message ------------------ */
+  const handleSend = async () => {
+     if (sending) return; // prevent double sending
+    if (!canChat || (!message.trim() && !selectedFile)) return;
+setSending(true); // disable butto
+    const recipientIds = activeChat === "cs" ? adminIds : [customer?._id];
     
-    // Data required for both text and file
-    const chatData = {
-      rideId: activeRide._id,
-      senderId: user._id,
-      senderRole: user.role, // Assuming user.role is "customer" or "driver"
-      recipientId: selectedUser.id,
-    };
+    if (!recipientIds || recipientIds.length === 0) {
+       setSending(false);
+      return alert("No recipients available");
+    }
 
     try {
-        if (selectedFile) {
-            // --- File Sending Logic ---
-            const formData = new FormData();
-            formData.append("file", selectedFile);
-            formData.append("rideId", chatData.rideId);
-            formData.append("senderId", chatData.senderId);
-            formData.append("senderRole", chatData.senderRole);
-            formData.append("recipientId", chatData.recipientId);
-            
-            // Optimistic message creation (will be updated by socket later if successful)
-            const optimisticFileMessage = { 
-                from: "me",
-                file: URL.createObjectURL(selectedFile),
-                fileName: selectedFile.name,
-                fileType: selectedFile.type.startsWith("image/") ? "image" : "file", // Corrected file type logic
-                timestamp: new Date().toISOString(),
-                optimistic: true // Mark for potential update
-            };
+      if (selectedFile) {
+        // File upload logic
+        const tempUrl = URL.createObjectURL(selectedFile);
+        const clientMessageId = uuidv4();
 
-            setMessages((prev) => ({
-                ...prev,
-                [selectedUser.id]: [...(prev[selectedUser.id] || []).filter(m => !m.optimistic), optimisticFileMessage],
-            }));
+        const optimisticMsgs = recipientIds.map((id) => ({
+          senderId: user._id,
+          recipientId: id,
+          fileUrl: tempUrl,
+          fileType: selectedFile.type.startsWith("image/") ? "image" : "file",
+          createdAt: new Date().toISOString(),
+          optimistic: true,
+        }));
+        // setMessages((prev) => [...prev, ...optimisticMsgs]);
 
+        const formData = new FormData();
+        formData.append("file", selectedFile);
+        formData.append("senderId", user._id);
+        formData.append("senderRole", user.role);
+        formData.append("clientMessageId", clientMessageId);
 
-            const fileRes = await axios.post(`${endPoint}/chat/upload`, formData, {
-                headers: {
-                    "Content-Type": "multipart/form-data",
-                },
-            });
+        const endpoint = activeChat === "cs" 
+          ? `${endPoint}/chat/support/upload`  // You'll need to create this endpoint
+          : `${endPoint}/chat/upload`;
 
-            console.log("File sent:", fileRes.data.chat);
-            
-            // Clear inputs
-            setSelectedFile(null);
-            if (fileInputRef.current) fileInputRef.current.value = "";
-            if (imageInputRef.current) imageInputRef.current.value = "";
+        for (let id of recipientIds) {
+          formData.set("recipientId", id);
+          if (activeChat === "customer") {
+            formData.set("rideId", ride?._id);
+          }
 
-            // NOTE: The successful message is handled by the socket listener (handleIncomingMessage),
-            // which handles the message based on the backend's emission. We remove the direct 
-            // state update here to rely on the single source of truth (the socket).
+          const fileRes = await axios.post(endpoint, formData, {
+            headers: { 
+              "Content-Type": "multipart/form-data",
+              Authorization: `Bearer ${token}`
+            },
+          });
 
-        } else {
-            // --- Text Sending Logic ---
-            const textData = { ...chatData, text: message.trim() };
-           console.log(textData)
-            // Optimistic message creation (will be updated by socket later if successful)
-            const optimisticTextMessage = { 
-                from: "me",
-                text: message.trim(),
-                timestamp: new Date().toISOString(),
-                optimistic: true
-            };
-            setMessages((prev) => ({
-                ...prev,
-                [selectedUser.id]: [...(prev[selectedUser.id] || []).filter(m => !m.optimistic), optimisticTextMessage],
-            }));
-            
-            const textRes = await axios.post(`${endPoint}/chat/send`, textData);
-
-            console.log("Message sent:", textRes.data.chat);
-
-            // Clear message input
-            setMessage(""); 
-            
-            // NOTE: Relying on the socket listener (handleIncomingMessage) for final UI update.
+          setMessages((prev) =>
+            prev.map(m => 
+              m.optimistic && m.recipientId === id 
+                ? { ...fileRes.data.chat, createdAt: new Date().toISOString() }
+                : m
+            ).filter(m => !m.optimistic || m.recipientId !== id)
+          );
         }
 
-        setMessage(""); // Clear message input
+        setSelectedFile(null);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        if (imageInputRef.current) imageInputRef.current.value = "";
+      } else {
+        // Text message logic
+        const clientMessageId = uuidv4();
         
-    } catch (error) {
-        console.error("Failed to send message/file:", error.response?.data, error);
-        alert(`Failed to send message: ${error.response?.data?.message || error.message}`);
-        
-        // If an error occurs, you might want to filter out the optimistic message
-        setMessages((prev) => ({
-             ...prev,
-             [selectedUser.id]: (prev[selectedUser.id] || []).filter(m => !m.optimistic),
+        const optimisticTexts = recipientIds.map((id) => ({
+          senderId: user._id,
+          recipientId: id,
+          message: message.trim(),
+          createdAt: new Date().toISOString(),
+          optimistic: true,
+          rideId: activeChat === "customer" ? ride?._id : null,
         }));
-    }
-  };
+        
+        // setMessages((prev) => [...prev, ...optimisticTexts]);
 
-  const handleBack = () => {
-    setSelectedUser(null);
-    setRideStatus(null);
-    setActiveRide(null);
-    // Clear all query params on back
-    navigate("/dashboard/chat"); 
-    setSelectedFile(null);
-    setMessage("");
-  };
+        if (activeChat === "cs") {
+          const textData = {
+            text: message.trim(),
+            recipientId: adminIds,
+            clientMessageId,
+          };
 
-  const handleFileChange = (e) => {
-    if (!canSendMessages) {
-      alert("Messaging is only available when ride status is: accepted, on_the_way, or in_progress");
-      e.target.value = ""; // Clear the file input
-      return;
-    }
+          const savedMsg = await axios.post(`${endPoint}/chat/support/send`, textData, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
 
-    const file = e.target.files[0];
-    if (file) {
-      setSelectedFile(file);
+          setMessages((prev) =>
+            prev.filter((m) => !m.optimistic).concat(savedMsg.data.chat)
+          );
+        } else {
+          for (let id of recipientIds) {
+            const textData = {
+  rideId: ride?._id,
+  senderId: user._id,        // ✅ REQUIRED
+  senderRole: user.role,     // ✅ REQUIRED
+  recipientId: id,
+  text: message.trim(),
+  clientMessageId,
+};
+            
+            const savedMsg = await axios.post(`${endPoint}/chat/send`, textData, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+
+            setMessages((prev) =>
+              prev.map(m => 
+                m.optimistic && m.recipientId === id 
+                  ? savedMsg.data.chat 
+                  : m
+              ).filter(m => !m.optimistic || m.recipientId !== id)
+            );
+          }
+        }
+      }
+
       setMessage("");
-    }
+    } catch (err) {
+      console.error("Failed to send message:", err);
+      setMessages((prev) => prev.filter(m => !m.optimistic));
+    }finally {
+    setSending(false); // re-enable button
+    setMessage("");     // clear input
+  }
+  };
+
+  /* ------------------ file handling ------------------ */
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) setSelectedFile(file);
   };
 
   const handleRemoveFile = () => {
-    if (selectedFile) {
-      setSelectedFile(null);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-      if (imageInputRef.current) imageInputRef.current.value = "";
-    }
+    setSelectedFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (imageInputRef.current) imageInputRef.current.value = "";
   };
 
-  // Status message component
-  const StatusMessage = () => {
-    if (!rideStatus) return null;
-    
-    if (canSendMessages) {
-      return (
-        <div className="bg-green-100 border border-green-400 text-green-700 px-3 py-1 rounded text-sm mb-2">
-          ✓ Messaging enabled (Ride status: {rideStatus})
-        </div>
-      );
-    } else {
-      return (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-3 py-1 rounded text-sm mb-2">
-          ⚠ Messaging disabled. Current ride status: "{rideStatus}". 
-          <br />Messaging is only available when ride status is: accepted, on_the_way, or in_progress
-        </div>
-      );
-    }
-  };
+  /* ------------------ message bubble component ------------------ */
+  const MessageBubble = ({ msg }) => {
+    const fromMe = msg.senderId === user._id;
+    const isCustomerService = msg.senderRole === "admin";
+    const isRightAligned = fromMe;
 
-  // Cleanup created object URLs on unmount or when selectedFile changes
-  useEffect(() => {
-    let objectUrl;
-    if (selectedFile) {
-      objectUrl = URL.createObjectURL(selectedFile);
-      return () => {
-        URL.revokeObjectURL(objectUrl);
-      };
-    }
-  }, [selectedFile]);
-
-  // Placeholder for chat recipient name
-  const chatRecipientName = selectedUser?.firstname ? `${selectedUser.firstname} ${selectedUser.lastname || ''}` : "User";
-
-  return (
-    <div className="flex h-[600px] max-w-4xl mx-auto bg-white shadow-md rounded-xl overflow-hidden relative md:mt-0 mt-6">
-      {/* Sidebar */}
+    return (
       <div
-        className={`w-full sm:w-1/3 border-r bg-gray-100 absolute sm:relative z-10 transition-transform duration-300 ${
-          selectedUser ? "translate-x-full sm:translate-x-0" : "translate-x-0"
-        } sm:translate-x-0`}
-      >
-        <div className="p-4 text-xl font-bold border-b">
-          {activeRide?.status ? `Active Ride Chat (${activeRide.status})` : 'Chats'}
-        </div>
-        <ul>
-          {users?.map((user) => (
-            <li
-              key={user.id}
-              onClick={() => handleUserClick(user)}
-              // Apply disabled styles if not selectable
-              className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-200 
-                ${selectedUser?.id === user.id ? "bg-gray-200" : ""}
-                ${!isUserSelectable() ? "opacity-50 cursor-not-allowed" : ""}
-              `}
-              title={isUserSelectable() ? `Chat with ${user.firstname}` : `Chat disabled: Ride status is ${rideStatus}`}
-            >
-              <div className="relative">
-                <div className="w-10 h-10 bg-blue-200 rounded-full flex items-center justify-center text-lg font-semibold">
-                  {user?.firstname?.charAt(0)}
-                </div>
-              </div>
-              <div>
-                <div className="font-medium">{user?.firstname} {user?.lastname}</div>
-                <div className={`text-sm ${isUserSelectable() ? 'text-green-500' : 'text-red-500'}`}>
-                    {isUserSelectable() ? "Active Chat" : "Chat Disabled"}
-                </div>
-              </div>
-            </li>
-          ))}
-          {!activeRide && (
-            <li className="px-4 py-3 text-gray-500">
-                No active ride to chat about.
-            </li>
-          )}
-        </ul>
-      </div>
-
-      {/* Chat Box */}
-      <div
-        className={`w-full sm:flex-1 flex flex-col transition-transform duration-300 ${
-          selectedUser ? "translate-x-0" : "translate-x-full sm:translate-x-0"
+        className={`max-w-[300px] px-3 py-2 rounded-xl text-sm break-words ${
+          isRightAligned ? "ml-auto" : "mr-auto"
+        } ${
+          fromMe
+            ? "bg-blue-500 text-white"
+            : isCustomerService
+            ? "bg-purple-500 text-white"
+            : "bg-gray-200 text-gray-800"
         }`}
       >
-        {selectedUser ? (
-          <>
-            <div className="p-4 border-b font-semibold flex items-center gap-2">
-              {/* Back Button for Mobile */}
-              <button
-                onClick={handleBack}
-                className="sm:hidden text-xl text-gray-600"
-              >
-                <IoArrowBackOutline />
-              </button>
-              Chat with {chatRecipientName}
-              {rideStatus && (
-                <span className={`text-xs px-2 py-1 rounded ${
-                  canSendMessages ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                }`}>
-                  Ride: {rideStatus}
-                </span>
-              )}
+        {isCustomerService && (
+          <div className="font-bold text-xs mb-1 opacity-90">Customer Service</div>
+        )}
+
+        {msg.fileUrl ? (
+          msg.fileType === "image" ? (
+            <img
+              src={msg.fileUrl}
+              alt="Shared"
+              className="w-[250px] h-[200px] rounded-md object-cover"
+            />
+          ) : (
+            <a
+              href={msg.fileUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline flex items-center gap-1"
+            >
+              <BsPaperclip /> {msg.fileName || "Download File"}
+            </a>
+          )
+        ) : (
+          msg.message
+        )}
+
+        <div className="text-xs opacity-70 mt-1 text-right">
+          {new Date(msg.createdAt).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  /* ------------------ UI ------------------ */
+  return (
+    <div className="flex md:mt-10 border border-1 h-[600px] max-w-4xl mx-auto bg-white shadow-lg rounded-lg overflow-hidden">
+      {/* Sidebar */}
+      <div className="w-1/3 border-r overflow-y-auto">
+        <div className="p-4 font-semibold text-lg border-b">Chats</div>
+
+        {/* Customer Service */}
+        <div
+          onClick={() => setActiveChat("cs")}
+          className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-200 transition-all mt-2 ${
+            activeChat === "cs" ? "bg-gray-100" : ""
+          }`}
+        >
+          <div className="relative">
+            <div className="w-10 h-10 bg-purple-200 rounded-full flex items-center justify-center text-lg font-semibold">
+              <MdOutlineSupportAgent className="text-3xl"/>
             </div>
-
-            {/* Status Message */}
-            {rideStatus && <StatusMessage />}
-
-            {/* Messages */}
-            <div className="flex-1 p-4 overflow-y-auto space-y-2">
-              {(messages[selectedUser.id] || []).map((msg, i) => (
-                <div
-                  key={i}
-                  className={`max-w-[300px] max-h-[300px] px-2 py-2 rounded-xl text-sm break-words ${
-                    msg.from === "me"
-                      ? "ml-auto bg-blue-500 text-white"
-                      : "bg-gray-200 text-gray-800"
-                  }`}
-                >
-                  {/* File/Image display logic */}
-                  {msg.fileType === "image" && msg.file ? (
-                    <img
-                      src={msg.file}
-                      alt={msg.fileName || "Shared image"}
-                      className="w-[300px] h-[250px] rounded-md mt-1 object-cover"
-                    />
-                  ) : msg.fileType && msg.file ? (
-                    <a
-                      href={msg.file}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="underline flex items-center gap-1"
-                    >
-                      <BsPaperclip />
-                      {msg.fileName || 'Download File'}
-                    </a>
-                  ) : (
-                    // Text message display
-                    <span>{msg.text}</span>
-                  )}
-                  
-                  {msg.timestamp && (
-                    <div className={`text-xs opacity-70 mt-1 ${msg.from === "me" ? 'text-right' : 'text-left'}`}>
-                      {new Date(msg.timestamp).toLocaleTimeString([], { 
-                        hour: '2-digit', 
-                        minute: '2-digit' 
-                      })}
-                      {msg.optimistic && <span className="ml-2 text-yellow-300 font-bold">(Sending...)</span>}
-                    </div>
-                  )}
-                </div>
-              ))}
-              <div ref={messagesEndRef} /> {/* Scroll target */}
-            </div>
-
-            {/* Input Area */}
-            <div className="p-3 border-t flex flex-col gap-2">
-              {/* Preview of selected file */}
-              {selectedFile && (
-                <div className="flex items-center justify-between p-2 bg-gray-100 rounded">
-                  {selectedFile.type.startsWith("image/") ? (
-                    <img
-                      src={URL.createObjectURL(selectedFile)}
-                      alt={selectedFile.name}
-                      className="h-16 rounded"
-                    />
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <BsPaperclip className="text-2xl text-gray-600" />
-                      <span className="truncate max-w-xs">{selectedFile.name}</span>
-                    </div>
-                  )}
-                  <button
-                    onClick={handleRemoveFile}
-                    className="text-red-600 font-bold px-2"
-                    title="Remove file"
-                  >
-                    ✕
-                  </button>
-                </div>
-              )}
-
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-2 text-xl text-gray-600">
-                  <label className={`cursor-pointer ${!canSendMessages ? 'opacity-50' : ''}`}>
-                    <BsPaperclip />
-                    <input
-                      type="file"
-                      hidden
-                      ref={fileInputRef}
-                      onChange={handleFileChange}
-                      disabled={!canSendMessages}
-                    />
-                  </label>
-                  <label className={`cursor-pointer ${!canSendMessages ? 'opacity-50' : ''}`}>
-                    <MdImage />
-                    <input
-                      type="file"
-                      accept="image/*"
-                      hidden
-                      ref={imageInputRef}
-                      onChange={handleFileChange}
-                      disabled={!canSendMessages}
-                    />
-                  </label>
-                </div>
-
-                <input
-                  type="text"
-                  className={`flex-1 border rounded-full px-4 py-2 outline-none ${
-                    !canSendMessages ? 'bg-gray-100 cursor-not-allowed' : ''
-                  }`}
-                  placeholder={
-                    canSendMessages 
-                      ? "Type your message..." 
-                      : "Messaging disabled for current ride status"
-                  }
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                  disabled={!!selectedFile || !canSendMessages}
-                />
-                <button
-                  onClick={handleSend}
-                  className={`p-2 rounded-full ${
-                    canSendMessages 
-                      ? 'bg-blue-500 text-white hover:bg-blue-600' 
-                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  }`}
-                  disabled={!canSendMessages}
-                  title={
-                    !canSendMessages 
-                      ? "Messaging only available when ride status is: accepted, on_the_way, or in_progress" 
-                      : "Send message"
-                  }
-                >
-                  <IoSend />
-                </button>
+          </div>
+          <div>
+            <div className="font-medium">Customer Service</div>
+            <div className="text-sm text-green-500">Admin</div>
+          </div>
+        </div>
+        
+        <div className="divider"></div>
+        
+        {/* Customer */}
+        {customer && (
+          <div
+            onClick={() => setActiveChat("customer")}
+            className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-200 transition-all ${
+              activeChat === "customer" ? "bg-gray-100" : ""
+            }`}
+          >
+            <div className="relative">
+              <div className="w-10 h-10 bg-blue-200 rounded-full flex items-center justify-center text-lg font-semibold">
+                {customer?.firstName?.charAt(0)}
               </div>
             </div>
-          </>
-        ) : (
-          <div className="hidden sm:flex flex-1 items-center justify-center text-gray-500">
-            {activeRide ? 'Select a user to start chatting' : 'No active ride found.'}
+            <div>
+              <div className="font-medium">
+                {customer.firstName} {customer.lastName}
+              </div>
+              <div className="text-sm text-green-500">Customer</div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Chat Window */}
+      <div className="flex-1 flex flex-col">
+        {/* Ride status */}
+        {rideStatus && (
+          <div
+            className={`px-4 py-1 text-sm text-center ${
+              canChat ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+            }`}
+          >
+            Ride status: {rideStatus} {canChat ? "(Messaging enabled)" : "(Messaging disabled)"}
+          </div>
+        )}
+
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+          {dedupedMessages.length === 0 && (
+            <div className="text-gray-500 text-center mt-20">No messages yet</div>
+          )}
+
+          {dedupedMessages.map((msg, i) => (
+            <MessageBubble key={i} msg={msg} />
+          ))}
+
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Input area */}
+        {canChat && (
+          <div className="p-3 border-t flex flex-col gap-2">
+            {selectedFile && (
+              <div className="flex items-center justify-between p-2 bg-gray-100 rounded">
+                {selectedFile.type.startsWith("image/") ? (
+                  <img
+                    src={URL.createObjectURL(selectedFile)}
+                    alt={selectedFile.name}
+                    className="h-16 rounded"
+                  />
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <BsPaperclip className="text-2xl text-gray-600" />
+                    <span className="truncate max-w-xs">{selectedFile.name}</span>
+                  </div>
+                )}
+                <button
+                  onClick={handleRemoveFile}
+                  className="text-red-600 font-bold px-2"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
+            <div className="flex items-center gap-2">
+              <label className="cursor-pointer text-xl text-gray-600">
+                <BsPaperclip />
+                <input
+                  type="file"
+                  hidden
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                />
+              </label>
+              <label className="cursor-pointer text-xl text-gray-600">
+                <MdImage />
+                <input
+                  type="file"
+                  accept="image/*"
+                  hidden
+                  ref={imageInputRef}
+                  onChange={handleFileChange}
+                />
+              </label>
+
+              <input
+                type="text"
+                className="flex-1 border rounded-full px-4 py-2 outline-none"
+                placeholder={
+                  canChat
+                    ? "Type your message..."
+                    : "Messaging disabled for current ride status"
+                }
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSend()}
+                disabled={!!selectedFile || !canChat}
+              />
+                 <button
+  onClick={handleSend}
+  className={`p-2 rounded-full flex items-center justify-center gap-1 ${
+    canChat && !sending
+      ? "bg-blue-500 text-white hover:bg-blue-600"
+      : "bg-gray-300 text-gray-500 cursor-not-allowed"
+  }`}
+  disabled={!canChat || sending}
+>
+  {sending ? (
+   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+  ) : (
+    <IoSend />
+  )}
+</button>
+
+            </div>
           </div>
         )}
       </div>

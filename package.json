@@ -39,7 +39,8 @@
     "recharts": "^3.0.2",
     "slick-carousel": "^1.8.1",
     "socket.io-client": "^4.8.1",
-    "swiper": "^11.1.9"
+    "swiper": "^11.1.9",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.13.0",
