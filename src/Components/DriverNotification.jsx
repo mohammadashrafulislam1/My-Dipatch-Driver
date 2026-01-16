@@ -134,11 +134,16 @@ export default function DriverNotification({ isActive }) {
     if (!ride?._id || !user?._id) return;
 
     try {
+      
       const res = await axios.put(`${endPoint}/rides/status/${ride._id}`, {
         status: "accepted",
         driverId: user._id,
       });
-
+// 2️⃣ Add driverId to SquarePayment (create or update)
+    await axios.put(`${endPoint}/payment/assign-driver`, {
+      rideId: ride._id,
+      driverId: user._id,
+    });
       console.log("✅ Ride accepted:", res.data);
 
       setQueue([]);
