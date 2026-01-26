@@ -12,7 +12,7 @@ import useAuth from "../../../Components/useAuth";
 
 const Wallet = () => {
   const { user, token } = useAuth();
-
+   console.log(user)
   // UI states
   const [showWithdraw, setShowWithdraw] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState("");
@@ -76,67 +76,81 @@ const handleSaveBankAccount = async () => {
   const APPLICATION_ID = import.meta.env.VITE_SQUARE_APPLICATION_ID;
   const LOCATION_ID = import.meta.env.VITE_SQUARE_LOCATION_ID;
 
-useEffect(() => {
-  const fetchBankStatus = async () => {
-    try {
-      const res = await axios.get(`${endPoint}/payment/square-payout`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      console.log(res)
-      setHasBankAccount(res.data?.cards?.length > 0);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  fetchBankStatus();
-}, [token]);
-
 
   // Fetch wallet & transactions
-  useEffect(() => {
-    if (!user) return;
+const fetchWallet = async () => {
+  try {
+    setLoading(true);
 
-    const fetchWalletData = async () => {
-      try {
-        setLoading(true);
+    // 1️⃣ Wallet API
+    const walletRes = await axios.get(
+      `${endPoint}/driverwallet/${user._id}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const walletData = walletRes.data;
 
-        // Ride history
-        const rideRes = await axios.get(
-          `${endPoint}/rides/driver/${user?._id || user.id}/history`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+    // 2️⃣ Ride history API
+    const rideRes = await axios.get(
+      `${endPoint}/rides/driver/${user._id}/history`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const rides = rideRes.data.rides || [];
 
-        const rides = rideRes.data.rides || [];
-        const rideTransactions = rides
-          .filter((r) => r.status === "completed")
-          .map((r) => ({
-            id: r._id,
-            type: `Ride #${r._id.slice(-4)}`,
-            method: "Cash", // Or use r.paymentMethod from backend
-            amount: Number(r.price),
-            date: new Date(r.createdAt),
-          }));
+    // 3️⃣ Convert wallet transactions
+    const walletTransactions = walletData.transactions.map(tx => ({
+      id: tx._id,
+      type:
+        tx.type === "ride"
+          ? `Ride #${tx.rideId?.slice(-4) || ""}`
+          : "Withdrawal",
+      method: tx.method,
+      amount: tx.type === "withdrawal" ? -tx.amount : tx.amount,
+      date: new Date(tx.createdAt),
+    }));
 
-        // Total earnings
-        const earningsRes = await axios.get(
-          `${endPoint}/rides/driver/${user?._id || user.id}/earnings`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+    // 4️⃣ Convert completed rides → transactions
+    const rideTransactions = rides
+      .filter(r => r.status === "completed")
+      .map(r => ({
+        id: r._id,
+        type: `Ride #${r._id.slice(-4)}`,
+        method: r.paymentMethod || "Cash",
+        amount: Number(r.price),
+        date: new Date(r.createdAt),
+      }));
 
-        setTotalEarnings(earningsRes.data.totalEarnings || 0);
-        setTransactions(rideTransactions);
-        setTotalWithdraw(0); // Placeholder
-      } catch (err) {
-        console.error(err);
-        toast.error("Failed to load wallet data");
-      } finally {
-        setLoading(false);
-      }
-    };
+    // 5️⃣ Merge + sort by date (latest first)
+    const mergedTransactions = [...walletTransactions, ...rideTransactions].sort(
+      (a, b) => b.date - a.date
+    );
 
-    fetchWalletData();
-  }, [user, token]);
+    // 6️⃣ Calculate totals from merged transactions
+    const totalEarned = mergedTransactions
+      .filter((t) => t.amount > 0)
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    const totalWithdrawn = mergedTransactions
+      .filter((t) => t.amount < 0)
+      .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+
+    // 7️⃣ Set state
+    setTotalEarnings(totalEarned);
+    setTotalWithdraw(totalWithdrawn);
+    setTransactions(mergedTransactions);
+
+  } catch (error) {
+    console.error(error);
+    toast.error("Failed to load wallet");
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+useEffect(() => {
+  if (user && token) fetchWallet();
+}, [user, token]);
+
 
   // Filter transactions by date range
   const filteredTransactions = transactions.filter((t) => {
@@ -158,36 +172,36 @@ useEffect(() => {
 
   const toggleCalendar = () => setShowCalendar((prev) => !prev);
 
-  const handleWithdrawToBank = async () => {
+ const handleRequestWithdrawal = async () => {
   if (!withdrawAmount || Number(withdrawAmount) <= 0) {
-    toast.error("Enter valid amount");
+    toast.error("Enter a valid amount");
     return;
   }
 
   try {
     const res = await axios.post(
-      `${endPoint}/payment/withdraw-bank`,
+      `${endPoint}/driverwallet/request-withdrawal`,
       { amount: Number(withdrawAmount) },
       { headers: { Authorization: `Bearer ${token}` } }
     );
 
     if (!res.data.success) {
-      toast.error(res.data.message || "Bank withdrawal failed");
+      toast.error(res.data.message || "Request failed");
       return;
     }
 
-    toast.success("Withdrawal sent to your bank!");
+    toast.success("Withdrawal request sent to admin!");
     setWithdrawAmount("");
     setShowWithdraw(false);
 
+    // Optionally update the UI
     setTotalEarnings((prev) => prev - Number(withdrawAmount));
     setTotalWithdraw((prev) => prev + Number(withdrawAmount));
   } catch (err) {
     console.error(err);
-    toast.error("Withdrawal failed");
+    toast.error("Request failed");
   }
 };
-
  
   return (
     <div className="md:max-w-3xl flex flex-col md:gap-3 gap-2 mx-auto p-4 relative md:mt-0 mt-6">
@@ -203,12 +217,19 @@ useEffect(() => {
 
       {/* Buttons */}
       <div className="flex justify-end gap-3">
-        <button
-  onClick={() => setShowWithdraw(true)}
+     <button
+  onClick={() => {
+    if (!hasBankAccount) {
+      setShowBankModal(true);
+    } else {
+      setShowWithdraw(true);
+    }
+  }}
   className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-xl font-semibold shadow"
 >
   Withdraw to Bank
 </button>
+
 
 <button
   onClick={() => setShowBankModal(true)}
@@ -225,11 +246,26 @@ useEffect(() => {
     <div className="bg-white p-6 rounded-xl shadow-lg w-[90%] max-w-md">
       <h2 className="text-xl font-semibold mb-4">Withdraw to Bank</h2>
 
-      {!hasBankAccount && (
-        <div className="mb-3 text-sm text-red-600">
-          Please add a bank account first.
-        </div>
-      )}
+    {hasBankAccount && (
+  <div className="mb-4 p-3 bg-gray-50 border rounded-lg">
+    <div className="text-sm text-gray-600">Withdrawal Bank</div>
+    <div className="font-medium text-gray-800">{bankName}</div>
+    <div className="text-sm text-gray-500">
+      Account: ****{accountNumber.slice(-4)}
+    </div>
+
+    <button
+      type="button"
+      onClick={() => {
+        setShowWithdraw(false);
+        setShowBankModal(true);
+      }}
+      className="mt-2 text-sm text-indigo-600 hover:underline"
+    >
+      Edit bank details
+    </button>
+  </div>
+)}
 
       <div className="flex w-full gap-2 mb-3">
         <input
@@ -257,17 +293,18 @@ useEffect(() => {
         >
           Cancel
         </button>
-        <button
-          onClick={handleWithdrawToBank}
-          disabled={!hasBankAccount || !withdrawAmount || Number(withdrawAmount) <= 0}
-          className={`px-4 py-2 text-white rounded-lg ${
-            hasBankAccount
-              ? "bg-green-600 hover:bg-green-700"
-              : "bg-gray-400 cursor-not-allowed"
-          }`}
-        >
-          Confirm
-        </button>
+       <button
+  onClick={handleRequestWithdrawal}
+  disabled={!hasBankAccount || !withdrawAmount || Number(withdrawAmount) <= 0}
+  className={`px-4 py-2 text-white rounded-lg ${
+    hasBankAccount
+      ? "bg-green-600 hover:bg-green-700"
+      : "bg-gray-400 cursor-not-allowed"
+  }`}
+>
+  Confirm
+</button>
+
       </div>
     </div>
   </div>

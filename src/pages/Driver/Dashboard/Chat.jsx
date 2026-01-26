@@ -29,6 +29,9 @@ const [sending, setSending] = useState(false);
   const imageInputRef = useRef(null);
   const messagesEndRef = useRef(null);
 
+const [showChat, setShowChat] = useState(false);
+
+const isMobile = useMemo(() => window.innerWidth < 768, []);
   /* ------------------ helpers ------------------ */
   const dedupeByClientMessageId = (msgs) => {
     const map = new Map();
@@ -402,14 +405,18 @@ setSending(true); // disable butto
 
   /* ------------------ UI ------------------ */
   return (
-    <div className="flex md:mt-10 border border-1 h-[600px] max-w-4xl mx-auto bg-white shadow-lg rounded-lg overflow-hidden">
+    <div className="flex mt-10 border border-1 md:h-[600px] h-[400px] max-w-4xl mx-auto bg-white shadow-lg rounded-lg overflow-hidden">
       {/* Sidebar */}
-      <div className="w-1/3 border-r overflow-y-auto">
+     {(!isMobile || !showChat) && ( <div className="md:w-1/3 w-full border-r overflow-y-auto">
         <div className="p-4 font-semibold text-lg border-b">Chats</div>
 
         {/* Customer Service */}
         <div
-          onClick={() => setActiveChat("cs")}
+          onClick={() => {
+  setActiveChat("cs");
+  if (isMobile) setShowChat(true);
+}}
+
           className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-200 transition-all mt-2 ${
             activeChat === "cs" ? "bg-gray-100" : ""
           }`}
@@ -430,7 +437,8 @@ setSending(true); // disable butto
         {/* Customer */}
         {customer && (
           <div
-            onClick={() => setActiveChat("customer")}
+            onClick={() => {setActiveChat("customer")
+  if (isMobile) setShowChat(true)}}
             className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-200 transition-all ${
               activeChat === "customer" ? "bg-gray-100" : ""
             }`}
@@ -448,11 +456,27 @@ setSending(true); // disable butto
             </div>
           </div>
         )}
-      </div>
+      </div>)}
 
       {/* Chat Window */}
-      <div className="flex-1 flex flex-col">
+   {(!isMobile || showChat) && (   <div className="flex-1 flex flex-col">
         {/* Ride status */}
+        {isMobile && (
+  <div className="flex items-center gap-2 p-3 border-b">
+    <button
+      onClick={() => setShowChat(false)}
+      className="text-blue-600 font-medium"
+    >
+      ← Back
+    </button>
+    <span className="font-semibold">
+      {activeChat === "cs"
+        ? "Customer Service"
+        : `${driver?.firstName} ${driver?.lastName}`}
+    </span>
+  </div>
+)}
+
         {rideStatus && (
           <div
             className={`px-4 py-1 text-sm text-center ${
@@ -555,7 +579,7 @@ setSending(true); // disable butto
             </div>
           </div>
         )}
-      </div>
+      </div>)}
     </div>
   );
 };
