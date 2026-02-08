@@ -504,9 +504,8 @@ const showRouteToNextDestination = useCallback(async () => {
 
 // Move from current location → Pickup
 const handleStartToPickup = useCallback(async () => {
-
+centerOnDriver();
   if (!driverLocation || !rideData?.pickup || !mapInstance.current) return;
-
   setRideStatus("in_progress");
   setJourneyStarted(true);
   setFollowDriver(true);
@@ -618,6 +617,7 @@ const removeFirstMidwayStop = () => {
 
 // Stop at midway stop and immediately show route to dropoff
 const handleAtMidwayStop = async () => {
+centerOnDriver();
   const currentStopNumber = (rideData?.midwayStops?.length || 0) > 0 ? 
     rideData.midwayStops.length : 0;
   const totalStops = (rideData?.midwayStops?.length || 0) + currentStopNumber;
@@ -741,6 +741,7 @@ const showRouteToDropoffFromCurrentLocation = async () => {
 //-------
 // Update the handlePickupToMidway function
 const handlePickupToMidway = useCallback(async () => {
+centerOnDriver();
   if (!driverLocation || !rideData?.midwayStops?.length || !mapInstance.current) return;
 
   setRideStatus("on_the_way");
@@ -948,8 +949,8 @@ const updateCurrentToPickupRoute = useCallback(async () => {
 
 // Update the handlePickupToDropoff function
 const handlePickupToDropoff = useCallback(async () => {
+centerOnDriver();
   if (!driverLocation || !rideData?.dropoff || !mapInstance.current) return;
-
   setRideStatus("on_the_way");
   setFollowDriver(true);
 
@@ -1037,6 +1038,7 @@ const handlePickupToDropoff = useCallback(async () => {
 
 // Update the handleMidwayToDropoff function as well
 const handleMidwayToDropoff = useCallback(async () => {
+centerOnDriver();
   if (!driverLocation || !rideData.dropoff || !mapInstance.current) return;
 
   setRideStatus("on_the_way");

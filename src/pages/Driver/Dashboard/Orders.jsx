@@ -43,7 +43,7 @@ const Order = () => {
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, totalItems);
   const currentOrders = allOrders.slice(startIndex, endIndex);
-
+console.log("currentOrders", currentOrders)
   return (
     <div className="p-4">
       <div className="mb-2 text-sm font-medium">
