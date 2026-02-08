@@ -11,12 +11,12 @@ import Login from "../pages/Authentication/Login";
 import Signup from "../pages/Authentication/Signup";
 import Profile from "../pages/Driver/Profile/Profile";
 import Settings from "../pages/Driver/Profile/Setting";
-import Notification from "../pages/Driver/Profile/Notification";
 import Support from "../pages/Driver/Dashboard/Support";
 import RideMap from "../pages/RideMap";
 import PrivateRoute from "./PrivateRouter";
 import ErrorPage from "../Components/ErrorPage";
 import Layout from "../Components/Layout";
+import Notification from "../pages/Driver/Profile/Notification";
 
 export const router = createBrowserRouter([
   {
@@ -28,18 +28,18 @@ export const router = createBrowserRouter([
 
       {
         path: "dashboard",
-        element: <Dashboard />,
+        element: <PrivateRoute><Dashboard /></PrivateRoute>,
         children: [
-          { index: true, element: <Default /> },
-          { path: "orders", element: <Order /> },
-          { path: "reviews", element: <Reviews /> },
-          { path: "earnings", element: <Earnings /> },
-          { path: "support", element: <Support /> },
-          { path: "chat", element: <Chat /> },
-          { path: "wallet", element: <Wallet /> },
-          { path: "profile", element: <Profile /> },
-          { path: "settings", element: <Settings /> },
-          { path: "notifications", element: <Notification /> }
+          { index: true, element: <PrivateRoute><Default /> </PrivateRoute>},
+          { path: "orders", element: <PrivateRoute><Order /></PrivateRoute> },
+          { path: "reviews", element: <PrivateRoute><Reviews /></PrivateRoute> },
+          { path: "earnings", element: <PrivateRoute><Earnings /></PrivateRoute>},
+          { path: "support", element:<PrivateRoute> <Support /></PrivateRoute> },
+          { path: "chat", element:<PrivateRoute> <Chat /></PrivateRoute> },
+          { path: "wallet", element: <PrivateRoute><Wallet /></PrivateRoute> },
+          { path: "profile", element: <PrivateRoute><Profile /> </PrivateRoute>},
+          { path: "settings", element: <PrivateRoute><Settings /> </PrivateRoute>},
+          { path: "notifications", element: <PrivateRoute><Notification /></PrivateRoute> }
         ]
       },
 

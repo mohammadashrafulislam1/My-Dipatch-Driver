@@ -27,10 +27,11 @@ import { TfiAlignLeft } from "react-icons/tfi";
 import { VscSignOut } from "react-icons/vsc";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import useAuth from "../../../Components/useAuth";
-import NotificationComp from "../../../Components/Notifications";
 import axios from "axios";
 import { endPoint } from "../../../Components/ForAPIs";
 import { io } from "socket.io-client";
+import { useNotifications } from "../../../Components/Notifications";
+import NotificationComp from "../../../Components/NotificationComp";
 
 
 const Dashboard = () => {
@@ -41,12 +42,18 @@ const Dashboard = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const {user, loading, logout} = useAuth();
+  const { notifications, unreadCount, markAsRead, deleteNotification } =useNotifications();
   const [notifCount, setNotifCount] = useState(0);
 const [chatUser, setChatUser] = useState(null);
 const [activeRideId, setActiveRideId] = useState(null);
 const [rideStatus, setRideStatus] = useState(null);
 const [chatCount, setChatCount] = useState(0);
+  useEffect(() => {
+    setNotifCount(unreadCount);
+  }, [notifications]);
 
+  console.log("notifications", notifications)
+  console.log("unreadCount", unreadCount)
 useEffect(() => {
   if (!user?._id) return;
 

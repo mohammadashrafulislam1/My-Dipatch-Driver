@@ -1,10 +1,7 @@
-import NotificationComp from "../../../Components/Notifications";
-
+import NotificationComp from "../../../Components/NotificationComp";
 
 const Notification = () => {
-  return (
-    <NotificationComp/>
-  );
+  return <NotificationComp />;
 };
 
 export default Notification;

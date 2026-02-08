@@ -20,6 +20,8 @@ import { router } from './Router/router.jsx';
 import AuthProvider from './Router/AuthProvider.jsx';
 import { ActiveRideProvider } from './contexts/ActiveRideContext.jsx';
 import GlobalRideStatus from './Components/GlobalRideStatus';
+import { NotificationProvider } from './Components/Notifications.jsx';
+import NotificationComp from './Components/NotificationComp.jsx';
 
 // Create a wrapper component that includes the global status
 const AppWrapper = ({ children }) => {
@@ -38,10 +40,10 @@ document.body.setAttribute("data-page", window.location.pathname);
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <AuthProvider>
+    <AuthProvider><NotificationProvider>
       <ActiveRideProvider>
         <RouterProvider router={router} />
-      </ActiveRideProvider>
+      </ActiveRideProvider></NotificationProvider>
     </AuthProvider>
   </StrictMode>
   
