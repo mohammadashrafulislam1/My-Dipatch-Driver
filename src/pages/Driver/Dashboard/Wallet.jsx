@@ -90,53 +90,18 @@ const fetchWallet = async () => {
     const walletData = walletRes.data;
 
     // 2️⃣ Ride history API
-    const rideRes = await axios.get(
-      `${endPoint}/rides/driver/${user._id}/history`,
+    const ride_Res = await axios.get(
+      `${endPoint}/driverwallet/${user._id}`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
-    const rides = rideRes.data.rides || [];
+    console.log("ride_Res", ride_Res);
+    const transaction = ride_Res.data || [];
 
-    // 3️⃣ Convert wallet transactions
-    const walletTransactions = walletData.transactions.map(tx => ({
-      id: tx._id,
-      type:
-        tx.type === "ride"
-          ? `Ride #${tx.rideId?.slice(-4) || ""}`
-          : "Withdrawal",
-      method: tx.method,
-      amount: tx.type === "withdrawal" ? -tx.amount : tx.amount,
-      date: new Date(tx.createdAt),
-    }));
-
-    // 4️⃣ Convert completed rides → transactions
-    const rideTransactions = rides
-      .filter(r => r.status === "completed")
-      .map(r => ({
-        id: r._id,
-        type: `Ride #${r._id.slice(-4)}`,
-        method: r.paymentMethod || "Cash",
-        amount: Number(r.price),
-        date: new Date(r.createdAt),
-      }));
-
-    // 5️⃣ Merge + sort by date (latest first)
-    const mergedTransactions = [...walletTransactions, ...rideTransactions].sort(
-      (a, b) => b.date - a.date
-    );
-
-    // 6️⃣ Calculate totals from merged transactions
-    const totalEarned = mergedTransactions
-      .filter((t) => t.amount > 0)
-      .reduce((sum, t) => sum + t.amount, 0);
-
-    const totalWithdrawn = mergedTransactions
-      .filter((t) => t.amount < 0)
-      .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
     // 7️⃣ Set state
-    setTotalEarnings(totalEarned);
-    setTotalWithdraw(totalWithdrawn);
-    setTransactions(mergedTransactions);
+    setTotalEarnings(transaction?.totalEarnings);
+    setTotalWithdraw(transaction?.totalWithdrawn);
+    setTransactions(transaction?.transactions);
 
   } catch (error) {
     console.error(error);
@@ -152,25 +117,65 @@ useEffect(() => {
 }, [user, token]);
 
 
-  // Filter transactions by date range
-  const filteredTransactions = transactions.filter((t) => {
-    const { startDate, endDate } = range[0];
-    return t.date >= startDate && t.date <= endDate;
-  });
+// Helper to safely get a Date object from transaction
+const getTransactionDate = (t) => {
+  if (!t || !t.createdAt) return null;
 
-  // Daily & weekly earnings
-  const today = new Date().toDateString();
-  const todayEarnings = transactions
-    .filter((t) => t.date.toDateString() === today)
-    .reduce((sum, t) => sum + t.amount, 0);
+  let date;
+  
+  // If it's an object with $date (Mongo extended JSON), use it
+  if (typeof t.createdAt === "object" && "$date" in t.createdAt) {
+    date = new Date(t.createdAt.$date);
+  } else {
+    // Otherwise assume it's a string or Date
+    date = new Date(t.createdAt);
+  }
 
-  const oneWeekAgo = new Date();
-  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-  const weeklyEarnings = transactions
-    .filter((t) => t.date >= oneWeekAgo)
-    .reduce((sum, t) => sum + t.amount, 0);
+  return isNaN(date.getTime()) ? null : date;
+};
 
-  const toggleCalendar = () => setShowCalendar((prev) => !prev);
+// Filtered transactions by range
+const { startDate, endDate } = range[0];
+const start = new Date(startDate);
+const end = new Date(endDate);
+
+const filteredTransactions = transactions.filter((t) => {
+  const createdAt = getTransactionDate(t);
+  if (!createdAt) return false;
+  return createdAt >= start && createdAt <= end;
+});
+
+console.log("filteredTransactions", filteredTransactions);
+
+// Parse date safely
+const parseDate = (t) => {
+  if (!t || !t.createdAt) return null;
+  const d = new Date(t.createdAt);
+  return isNaN(d.getTime()) ? null : d; // return null if invalid
+};
+
+// Daily earnings
+const today = new Date().toDateString();
+
+const todayEarnings = transactions
+  .map(parseDate)
+  .map((d, i) => ({ date: d, amount: transactions[i].amount }))
+  .filter((t) => t.date !== null && t.date.toDateString() === today)
+  .reduce((sum, t) => sum + t.amount, 0);
+
+// Weekly earnings
+const oneWeekAgo = new Date();
+oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+const weeklyEarnings = transactions
+  .map(parseDate)
+  .map((d, i) => ({ date: d, amount: transactions[i].amount }))
+  .filter((t) => t.date !== null && t.date >= oneWeekAgo)
+  .reduce((sum, t) => sum + t.amount, 0);
+
+// Calendar toggle
+const toggleCalendar = () => setShowCalendar((prev) => !prev);
+
 
  const handleRequestWithdrawal = async () => {
   if (!withdrawAmount || Number(withdrawAmount) <= 0) {
@@ -357,33 +362,54 @@ useEffect(() => {
       </div>
 
       {/* Transactions List */}
-      <ul className="space-y-3 mt-4">
-        {filteredTransactions.length === 0 && (
-          <div className="text-gray-500">No transactions found.</div>
-        )}
-        {filteredTransactions.map((t) => (
-          <li
-            key={t.id}
-            className="flex justify-between items-center p-4 bg-gray-50 rounded-lg shadow-sm"
-          >
-            <div>
-              <div className="font-medium">{t.type}</div>
-              <div className="text-sm text-gray-500">
-                {t.date.toDateString()} · {t.method}
-              </div>
-            </div>
-            <div
-              className={`font-semibold ${
-                t.amount > 0 ? "text-green-600" : "text-red-500"
-              }`}
-            >
-              {t.amount > 0
-                ? `+ $${t.amount.toFixed(2)}`
-                : `– $${Math.abs(t.amount).toFixed(2)}`}
-            </div>
-          </li>
-        ))}
-      </ul>
+    <ul className="space-y-3 mt-4">
+  {filteredTransactions.length === 0 && (
+    <div className="text-gray-500">No transactions found.</div>
+  )}
+  {filteredTransactions.map((t) => {
+    const date = getTransactionDate(t); // <--- safe Date object or null
+    return (
+      <li
+        key={t._id}
+        className="flex justify-between items-center p-4 bg-gray-50 rounded-lg shadow-sm"
+      >
+        <div>
+<div className="font-medium capitalize">
+  {t.type} #..{t._id.slice(-5)}
+</div>
+          <div className="text-sm text-gray-500">
+  {date ? date.toDateString() : "Invalid date"} · {t.method} ·{" "}
+  <span
+    className={
+      t.status === "pending"
+        ? "text-yellow-500"
+        : t.status === "approved"
+        ? "text-blue-500"
+        : t.status === "paid"
+        ? "text-green-600"
+        : t.status === "rejected"
+        ? "text-red-500"
+        : "text-gray-500"
+    }
+  >
+    {t.status}
+  </span>
+</div>
+
+        </div>
+        <div
+          className={`font-semibold ${
+            t.amount > 0 ? "text-green-600" : "text-red-500"
+          }`}
+        >
+          {t.amount > 0
+            ? `+ $${t.amount.toFixed(2)}`
+            : `– $${Math.abs(t.amount).toFixed(2)}`}
+        </div>
+      </li>
+    );
+  })}
+</ul>
 
       {/* Square Payout Modal */}
    {showBankModal && (

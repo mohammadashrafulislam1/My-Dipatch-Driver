@@ -49,32 +49,29 @@ export default function useLocationPermission({ setDriverLocation }) {
   };
 
   // 🔹 Watch permission changes (works in most modern browsers)
-  useEffect(() => {
-    if (!navigator.geolocation) {
-      setShowLocationModal(true);
-      setLocationEnabled(false);
-      return;
-    }
+ useEffect(() => {
+  if (!navigator.geolocation) {
+    setShowLocationModal(true);
+    setLocationEnabled(false);
+    return;
+  }
 
-    navigator.permissions
-      ?.query({ name: "geolocation" })
-      .then((res) => {
-        if (res.state === "denied") {
-          setShowLocationModal(true);
-          setLocationEnabled(false);
-        }
-        res.onchange = () => {
-          if (res.state === "denied") {
-            setShowLocationModal(true);
-            setLocationEnabled(false);
-          } else {
-            setShowLocationModal(false);
-            setLocationEnabled(true);
-          }
-        };
-      })
-      .catch(() => {});
-  }, []);
+  // 🔥 REAL permission check
+  navigator.geolocation.getCurrentPosition(
+    () => {
+      // Location works → hide modal
+      setLocationEnabled(true);
+      setShowLocationModal(false);
+    },
+    () => {
+      // Location blocked/denied
+      setLocationEnabled(false);
+      setShowLocationModal(true);
+    },
+    { timeout: 5000 }
+  );
+}, []);
+
 
   // 🔹 Handle geolocation watch errors
   const handleGeoError = (err) => {
